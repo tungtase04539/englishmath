@@ -17,6 +17,12 @@ try {
   CFG = Object.assign(CFG, JSON.parse(fs.readFileSync(path.join(ROOT, "supabase.config.json"), "utf8")));
 } catch (e) {}
 
+// Env vars override file config (dùng trên Vercel — không commit key vào code).
+// Lưu key đã decode (server tự encode lại khi gọi API), endpoint/dialect tuỳ chọn.
+if (process.env.SPEECHACE_KEY) CFG.key = process.env.SPEECHACE_KEY;
+if (process.env.SPEECHACE_ENDPOINT) CFG.endpoint = process.env.SPEECHACE_ENDPOINT;
+if (process.env.SPEECHACE_DIALECT) CFG.dialect = process.env.SPEECHACE_DIALECT;
+
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
