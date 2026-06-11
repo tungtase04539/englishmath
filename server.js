@@ -23,6 +23,13 @@ if (process.env.SPEECHACE_KEY) CFG.key = process.env.SPEECHACE_KEY;
 if (process.env.SPEECHACE_ENDPOINT) CFG.endpoint = process.env.SPEECHACE_ENDPOINT;
 if (process.env.SPEECHACE_DIALECT) CFG.dialect = process.env.SPEECHACE_DIALECT;
 
+// Service role key (BÍ MẬT — chỉ phía server, để tạo tài khoản học sinh).
+// Ưu tiên env var (Vercel); local đọc từ service.config.json (đã gitignore).
+let SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || "";
+if (!SERVICE_ROLE) {
+  try { SERVICE_ROLE = JSON.parse(fs.readFileSync(path.join(ROOT, "service.config.json"), "utf8")).serviceRole || ""; } catch (e) {}
+}
+
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -106,6 +113,58 @@ async function handleAssess(req, res) {
   upstream.end();
 }
 
+// Tạo tài khoản học sinh — chỉ giáo viên/admin đã duyệt mới được gọi.
+async function handleCreateStudent(req, res) {
+  const json = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
+  const supaUrl = process.env.SUPABASE_URL || CFG.supabaseUrl || "";
+  const anonKey = process.env.SUPABASE_ANON_KEY || CFG.supabaseKey || "";
+  if (!SERVICE_ROLE || !supaUrl) return json(500, { error: "Server chưa cấu hình service role." });
+
+  // 1) Xác thực token của người gọi
+  const auth = req.headers["authorization"] || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return json(401, { error: "Thiếu token đăng nhập." });
+  let caller;
+  try {
+    const r = await fetch(supaUrl + "/auth/v1/user", { headers: { apikey: anonKey, Authorization: "Bearer " + token } });
+    if (!r.ok) return json(401, { error: "Phiên đăng nhập không hợp lệ." });
+    caller = await r.json();
+  } catch (e) { return json(502, { error: "Lỗi xác thực: " + e.message }); }
+
+  // 2) Kiểm tra vai trò người gọi (teacher/admin + đã duyệt)
+  const SRH = { apikey: SERVICE_ROLE, Authorization: "Bearer " + SERVICE_ROLE, "Content-Type": "application/json" };
+  let prof;
+  try {
+    const r = await fetch(`${supaUrl}/rest/v1/mathenglish_profiles?id=eq.${caller.id}&select=role,approved`, { headers: SRH });
+    prof = (await r.json())[0];
+  } catch (e) { return json(502, { error: "Lỗi đọc hồ sơ: " + e.message }); }
+  if (!prof || !["teacher", "admin"].includes(prof.role) || prof.approved !== true) {
+    return json(403, { error: "Chỉ giáo viên/admin đã duyệt mới được tạo tài khoản học sinh." });
+  }
+
+  // 3) Đọc dữ liệu và tạo học sinh
+  let body;
+  try { body = JSON.parse((await readBody(req)).toString("utf8") || "{}"); } catch (e) { return json(400, { error: "Dữ liệu không hợp lệ." }); }
+  const email = (body.email || "").trim();
+  const password = body.password || "";
+  const fullName = (body.full_name || email.split("@")[0] || "Học sinh").trim();
+  if (!email || password.length < 6) return json(400, { error: "Cần email hợp lệ và mật khẩu tối thiểu 6 ký tự." });
+
+  try {
+    const r = await fetch(supaUrl + "/auth/v1/admin/users", {
+      method: "POST", headers: SRH,
+      body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { full_name: fullName, role: "student" } })
+    });
+    const created = await r.json();
+    if (!created.id) return json(400, { error: created.msg || created.error_description || created.error || "Không tạo được tài khoản (email có thể đã tồn tại)." });
+    // Học sinh do giáo viên tạo: duyệt sẵn để dùng được ngay
+    await fetch(`${supaUrl}/rest/v1/mathenglish_profiles?id=eq.${created.id}`, {
+      method: "PATCH", headers: SRH, body: JSON.stringify({ approved: true, full_name: fullName, role: "student" })
+    });
+    return json(200, { ok: true, email, full_name: fullName });
+  } catch (e) { return json(502, { error: "Lỗi tạo tài khoản: " + e.message }); }
+}
+
 http.createServer((req, res) => {
   if (req.url.startsWith("/api/health")) {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -119,5 +178,6 @@ http.createServer((req, res) => {
     }));
   }
   if (req.url.startsWith("/api/assess") && req.method === "POST") return handleAssess(req, res);
+  if (req.url.startsWith("/api/create-student") && req.method === "POST") return handleCreateStudent(req, res);
   serveStatic(req, res);
 }).listen(PORT, () => console.log(`MathEnglish chạy tại http://localhost:${PORT}/  (Speechace: ${CFG.key ? "ON" : "chưa cấu hình"})`));

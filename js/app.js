@@ -29,21 +29,40 @@ const store = {
 };
 
 // ---------- Audio / pronunciation ----------
-const audioCache = {};
+const audioCache = {};   // word -> URL (đã tải)  | null = đã thử nhưng không có
+let currentAudio = null; // <audio> đang phát, để dừng khi bấm từ khác
+
+// Dừng mọi âm thanh đang phát (audio + giọng đọc) — gọi trước mỗi lần phát mới
+function stopSpeak() {
+  if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch (e) {} currentAudio = null; }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+
 function speak(word) {
   const key = word.toLowerCase().trim();
+  stopSpeak(); // bấm liên tục không bị chồng tiếng / lag dồn
   const cached = audioCache[key];
-  if (cached) playAudio(cached, word);
-  else ttsSpeak(word);
-  prefetchAudio(word);
+  if (cached) {
+    playAudio(cached, word);          // có sẵn audio đẹp → phát ngay
+  } else {
+    ttsSpeak(word);                   // chưa có → đọc bằng giọng trình duyệt (tức thì, offline)
+    if (cached === undefined) prefetchAudio(key); // tải audio đẹp cho lần sau
+  }
 }
 function playAudio(src, word) {
-  try { const a = new Audio(src); const p = a.play(); if (p && p.catch) p.catch(() => ttsSpeak(word)); }
-  catch (e) { ttsSpeak(word); }
+  try {
+    const a = new Audio(src);
+    a.preload = "auto";
+    currentAudio = a;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => { if (currentAudio === a) { currentAudio = null; ttsSpeak(word); } });
+  } catch (e) { ttsSpeak(word); }
 }
 async function prefetchAudio(word) {
   const key = word.toLowerCase().trim();
-  if (!audioCache[key]) { const u = await fetchAudioUrl(key); if (u) audioCache[key] = u; }
+  if (audioCache[key] !== undefined) return;
+  const u = await fetchAudioUrl(key);
+  audioCache[key] = u || null; // ghi null để không gọi API lại
 }
 async function fetchAudioUrl(word) {
   const lookup = word.includes(" ") ? word.split(" ").pop() : word;
@@ -63,7 +82,7 @@ function pickVoice() {
   const voices = speechSynthesis.getVoices();
   enVoice = voices.find(v => /en[-_]US/i.test(v.lang)) || voices.find(v => /en[-_]GB/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || null;
 }
-if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; speechSynthesis.getVoices(); }
 let ttsRef = null;
 function ttsSpeak(text) {
   if (!("speechSynthesis" in window)) return;
@@ -72,13 +91,18 @@ function ttsSpeak(text) {
   const u = new SpeechSynthesisUtterance(text);
   u.rate = 0.9;
   if (enVoice) { u.voice = enVoice; u.lang = enVoice.lang; } else u.lang = "en-US";
-  ttsRef = u; speechSynthesis.speak(u);
-  if (speechSynthesis.paused) speechSynthesis.resume();
+  ttsRef = u;
+  // Chrome đôi khi "nuốt" lệnh nếu speak() gọi ngay sau cancel() — đẩy sang
+  // microtask kế tiếp để đảm bảo phát ra tiếng (sửa lỗi "ấn không đọc").
+  setTimeout(() => {
+    try { speechSynthesis.speak(u); if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
+  }, 0);
 }
 
 // ---------- Mascot intros per screen ----------
 const MASCOT_MSG = {
   dictionary: "Tra cứu từ vựng Toán nào! Bấm 🔊 để nghe phát âm nhé.",
+  study: "Học từng từ một nhé! Mình ưu tiên các từ bạn chưa thuộc. 📒",
   flashcard: "Lật thẻ để học nghĩa. Thuộc rồi thì bấm \"Đã thuộc\" để nhận XP! ✨",
   quiz: "Sẵn sàng kiểm tra chưa? Trả lời đúng được cộng điểm! 💪",
   speaking: "Đọc to và rõ ràng nhé, mình sẽ chấm điểm phát âm cho bạn! 🎤",
@@ -88,7 +112,7 @@ const MASCOT_MSG = {
 };
 
 // ---------- Mode switching ----------
-const ENGLISH_TABS = ["dictionary", "flashcard", "quiz", "speaking", "reading"];
+const ENGLISH_TABS = ["dictionary", "study", "flashcard", "quiz", "speaking", "reading"];
 function selectMode(mode) {
   document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
   const tabsBar = document.getElementById("tabs");
@@ -135,6 +159,8 @@ document.getElementById("tabs").addEventListener("click", e => {
     renderClassroom();
   } else if (btn.dataset.tab === "adminPanel" && typeof renderAdminPanel === "function") {
     renderAdminPanel();
+  } else if (btn.dataset.tab === "study" && typeof buildStudyDeck === "function") {
+    buildStudyDeck();
   }
 });
 
@@ -183,6 +209,86 @@ topicFilter.addEventListener("change", renderDictionary);
 learnFilter.addEventListener("change", renderDictionary);
 wordList.addEventListener("click", e => { const b = e.target.closest(".speak-btn"); if (b) speak(b.dataset.word); });
 renderDictionary();
+
+// ---------- HỌC TỪ VỰNG (chế độ học có hướng dẫn) ----------
+const studyTopic = document.getElementById("studyTopic");
+const studyScope = document.getElementById("studyScope");
+const studyCounter = document.getElementById("studyCounter");
+const studyCardEl = document.getElementById("studyCard");
+const studyDoneEl = document.getElementById("studyDone");
+const studyProgressFill = document.getElementById("studyProgressFill");
+fillTopicSelect(studyTopic, "Tất cả chủ đề");
+let studyDeck = [], studyIdx = 0, studyTotal = 0, studyLearnedCount = 0, studyRevealed = false;
+
+function buildStudyDeck() {
+  const tp = studyTopic.value;
+  const scope = studyScope.value;
+  studyDeck = VOCAB.filter(v => (!tp || v.topic === tp) && (scope === "all" || !store.isLearned(v.word)));
+  studyIdx = 0; studyTotal = studyDeck.length; studyLearnedCount = 0; studyRevealed = false;
+  showStudyCard();
+}
+function updateStudyProgress() {
+  const pct = studyTotal ? Math.round((studyIdx / studyTotal) * 100) : 0;
+  studyProgressFill.style.width = pct + "%";
+  studyCounter.textContent = studyTotal ? `${Math.min(studyIdx + 1, studyTotal)} / ${studyTotal}` : "0 / 0";
+}
+function showStudyCard() {
+  studyDoneEl.classList.add("hidden");
+  studyCardEl.classList.remove("hidden");
+  updateStudyProgress();
+  if (studyIdx >= studyDeck.length) return showStudyDone();
+  const v = studyDeck[studyIdx];
+  prefetchAudio(v.word);
+  studyCardEl.innerHTML = `
+    <div class="sd-topic">${esc(v.topic)}</div>
+    <div class="sd-word">${esc(v.word)}</div>
+    <div class="sd-ipa">${esc(v.ipa)}</div>
+    <button class="btn btn-sky" data-action="listen">🔊 Nghe phát âm</button>
+    <div class="sd-reveal ${studyRevealed ? "" : "hidden"}">
+      <div class="sd-vi">${esc(v.vi)}</div>
+      <div class="sd-ex">"${esc(v.example)}"<br><span>${esc(v.exampleVi)}</span></div>
+    </div>
+    ${studyRevealed
+      ? `<div class="sd-actions">
+           <button class="btn" data-action="review">🔁 Cần ôn lại</button>
+           <button class="btn btn-green" data-action="known">✓ Đã thuộc</button>
+         </div>`
+      : `<button class="btn btn-primary" data-action="reveal" style="margin-top:14px">👁️ Hiện nghĩa</button>`}
+  `;
+}
+function showStudyDone() {
+  studyCardEl.classList.add("hidden");
+  studyDoneEl.classList.remove("hidden");
+  studyProgressFill.style.width = "100%";
+  if (studyTotal === 0) {
+    studyCounter.textContent = "0 / 0";
+    studyDoneEl.innerHTML = `<div class="result-emoji">🌟</div>
+      <h2>Không còn từ cần học</h2>
+      <p style="font-weight:800;color:var(--ink-soft);margin-top:4px">Bạn đã thuộc hết từ trong phạm vi này! Hãy đổi chủ đề hoặc chọn "Tất cả từ" để ôn lại.</p>`;
+    return;
+  }
+  studyCounter.textContent = `${studyTotal} / ${studyTotal}`;
+  studyDoneEl.innerHTML = `<div class="result-emoji">🎉</div>
+    <h2>Hoàn thành phiên học!</h2>
+    <p style="font-weight:800;color:var(--ink-soft);margin-top:4px">Bạn đã đánh dấu thuộc ${studyLearnedCount} từ trong phiên này.</p>
+    <button class="btn btn-primary" data-action="restart" style="margin-top:16px">📒 Học tiếp các từ chưa thuộc</button>`;
+  G() && G().burst({ count: 120 }); G() && G().sound.levelup();
+}
+document.getElementById("study").addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const act = btn.dataset.action;
+  const v = studyDeck[studyIdx];
+  if (act === "listen") { if (v) speak(v.word); }
+  else if (act === "reveal") { studyRevealed = true; showStudyCard(); }
+  else if (act === "known") {
+    if (v && !store.isLearned(v.word)) { store.markLearned(v.word); studyLearnedCount++; G() && G().learn(15); }
+    studyIdx++; studyRevealed = false; showStudyCard();
+  }
+  else if (act === "review") { studyIdx++; studyRevealed = false; showStudyCard(); }
+  else if (act === "restart") { buildStudyDeck(); }
+});
+studyTopic.addEventListener("change", buildStudyDeck);
+studyScope.addEventListener("change", buildStudyDeck);
 
 // ---------- FLASHCARD ----------
 const flashTopic = document.getElementById("flashTopic");
@@ -717,21 +823,13 @@ function finishExam() {
   document.getElementById("examToList").onclick = showExamList;
 }
 
-// ---------- Sound toggle + init ----------
-document.getElementById("soundToggle").addEventListener("click", function () {
-  const on = !G().soundOn(); G().toggleSound(on);
-  this.textContent = on ? "🔊" : "🔇";
-  this.title = on ? "Tắt âm thanh" : "Bật âm thanh";
-  if (on) G().sound.click();
-});
+// ---------- Init ----------
 window.addEventListener("DOMContentLoaded", () => {
   G() && G().init();
-  const st = document.getElementById("soundToggle");
-  if (st) st.textContent = G().soundOn() ? "🔊" : "🔇";
   G() && G().mascotSay(MASCOT_MSG.dictionary);
 });
 // init may run after DOMContentLoaded already fired
-if (window.Game) { window.Game.init(); const st = document.getElementById("soundToggle"); if (st) st.textContent = window.Game.soundOn() ? "🔊" : "🔇"; }
+if (window.Game) { window.Game.init(); }
 
 // ============================================================
 // SUPABASE ROLE-BASED AUTH & DATABASE SYNCING
@@ -1042,6 +1140,45 @@ store.save = function() {
 };
 
 // Classroom page rendering logic
+// Giáo viên/admin tạo tài khoản học sinh (qua server endpoint dùng service role)
+const createStudentForm = document.getElementById("createStudentForm");
+if (createStudentForm) createStudentForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const statusEl = document.getElementById("csStatus");
+  const submitBtn = document.getElementById("csSubmit");
+  const full_name = document.getElementById("csName").value.trim();
+  const email = document.getElementById("csEmail").value.trim();
+  const password = document.getElementById("csPassword").value;
+  if (!supabaseClient) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) { statusEl.textContent = "Bạn cần đăng nhập lại."; statusEl.className = "cs-status err"; return; }
+
+  submitBtn.disabled = true; statusEl.textContent = "Đang tạo tài khoản..."; statusEl.className = "cs-status";
+  try {
+    const res = await fetch("/api/create-student", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
+      body: JSON.stringify({ full_name, email, password })
+    });
+    const json = await res.json();
+    if (res.ok && json.ok) {
+      statusEl.textContent = `✓ Đã tạo tài khoản học sinh: ${json.email}`;
+      statusEl.className = "cs-status ok";
+      createStudentForm.reset();
+      G() && G().toast("🎓", "Lớp học", "Đã tạo tài khoản học sinh!", "#16c47f");
+      renderClassroom();
+    } else {
+      statusEl.textContent = "✗ " + (json.error || "Không tạo được tài khoản.");
+      statusEl.className = "cs-status err";
+    }
+  } catch (err) {
+    statusEl.textContent = "✗ Lỗi kết nối: " + err.message;
+    statusEl.className = "cs-status err";
+  } finally {
+    submitBtn.disabled = false;
+  }
+};
+
 async function renderClassroom() {
   const tbody = document.getElementById("studentList");
   tbody.innerHTML = `<tr><td colspan="7" class="empty-note">Đang tải danh sách học sinh...</td></tr>`;

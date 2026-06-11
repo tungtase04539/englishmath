@@ -19,7 +19,6 @@
       </div>
     </div>
     <div class="hud">
-      <button id="soundToggle" class="hud-chip" title="Bật/tắt âm thanh" style="cursor:pointer">🔊</button>
       <div id="authChip" class="hud-chip auth-chip" title="Tài khoản" style="cursor:pointer">
         <span id="authIcon">👤</span><span id="authText">Đăng nhập</span>
       </div>
@@ -104,6 +103,7 @@
     <!-- ===== ACTIVITY TABS ===== -->
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="dictionary">📖 Tra từ</button>
+      <button class="tab" data-tab="study">📒 Học từ</button>
       <button class="tab" data-tab="flashcard">🃏 Flashcard</button>
       <button class="tab" data-tab="quiz">✏️ Quiz</button>
       <button class="tab" data-tab="speaking">🎤 Luyện nói</button>
@@ -125,6 +125,21 @@
           </select>
         </div>
         <div id="wordList" class="word-grid"></div>
+      </section>
+
+      <!-- HỌC TỪ VỰNG (chế độ học có hướng dẫn, ưu tiên từ chưa thuộc) -->
+      <section id="study" class="panel">
+        <div class="toolbar">
+          <select id="studyTopic"></select>
+          <select id="studyScope">
+            <option value="unlearned">📌 Từ chưa thuộc</option>
+            <option value="all">Tất cả từ</option>
+          </select>
+          <span id="studyCounter" class="counter"></span>
+        </div>
+        <div id="studyProgressBar" class="study-progress"><div id="studyProgressFill"></div></div>
+        <div id="studyCard" class="study-card"></div>
+        <div id="studyDone" class="hidden"></div>
       </section>
 
       <!-- FLASHCARD -->
@@ -254,7 +269,19 @@
       <!-- LỚP HỌC (TEACHER/ADMIN ONLY) -->
       <section id="classroom" class="panel">
         <h2>🏫 Quản lý lớp học</h2>
-        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Xem danh sách học sinh và tiến độ học tập của các em.</p>
+        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Tạo tài khoản và xem tiến độ học tập của học sinh.</p>
+
+        <div class="create-student-box">
+          <h3>➕ Tạo tài khoản học sinh</h3>
+          <form id="createStudentForm" class="create-student-form">
+            <input type="text" id="csName" placeholder="Họ tên học sinh" required />
+            <input type="email" id="csEmail" placeholder="Email đăng nhập" required />
+            <input type="password" id="csPassword" placeholder="Mật khẩu (tối thiểu 6 ký tự)" minlength="6" required />
+            <button type="submit" class="btn btn-primary" id="csSubmit">Tạo tài khoản</button>
+          </form>
+          <div id="csStatus" class="cs-status"></div>
+        </div>
+
         <div class="table-responsive">
           <table class="admin-table">
             <thead>

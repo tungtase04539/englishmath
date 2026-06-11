@@ -1,5 +1,6 @@
-# Bí mật — KHÔNG commit (chứa API key Speechace)
+# Bí mật — KHÔNG commit (chứa API key Speechace / service role)
 speechace.config.json
+service.config.json
 
 # Phụ thuộc / build
 node_modules/
