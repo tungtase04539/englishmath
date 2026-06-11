@@ -984,65 +984,73 @@ function setupAuthUI() {
 
 // Watch Auth state changes
 function setupAuthListeners() {
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
     currentUser = session ? session.user : null;
-    const authText = document.getElementById("authText");
-    const authIcon = document.getElementById("authIcon");
-    const tabClassroom = document.getElementById("tabClassroom");
-    const tabAdmin = document.getElementById("tabAdmin");
-
-    if (currentUser) {
-      // Fetch role + approval status
-      const { data: profile, error } = await supabaseClient.from("mathenglish_profiles").select("role, approved").eq("id", currentUser.id).single();
-      userRole = (!error && profile) ? profile.role : "student";
-      const approved = (!error && profile) ? (profile.approved === true || profile.role === "admin") : false;
-
-      // Cổng duyệt: chưa được duyệt → hiện màn chờ, không cho vào app
-      if (!approved) {
-        document.body.classList.remove("logged-out", "logged-in");
-        document.body.classList.add("pending-approval");
-        const pn = document.getElementById("pendingName");
-        if (pn) pn.textContent = currentUser.user_metadata?.full_name || currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
-        return;
-      }
-
-      // Đã duyệt → vào app
-      document.body.classList.remove("logged-out", "pending-approval");
-      document.body.classList.add("logged-in");
-
-      // Update auth chip UI
-      authText.textContent = currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
-      authText.style.maxWidth = "110px";
-      authText.style.overflow = "hidden";
-      authText.style.textOverflow = "ellipsis";
-      authText.style.whiteSpace = "nowrap";
-      authIcon.textContent = userRole === "admin" ? "🛠️" : userRole === "teacher" ? "🎓" : "👦";
-
-      // Show role-based tabs
-      tabClassroom.classList.toggle("hidden", userRole !== "teacher" && userRole !== "admin");
-      tabAdmin.classList.toggle("hidden", userRole !== "admin");
-
-      // Load and apply cloud progress (must not throw — an error here would
-      // leave Supabase's auth lock stuck and break logout/login afterwards)
-      try { await loadCloudProgress(); } catch (e) { console.error("loadCloudProgress failed:", e); }
+    // QUAN TRỌNG: callback này chạy trong khi supabase-js đang GIỮ navigator.locks
+    // của auth. Nếu gọi query DB (cần token → đòi lại lock) ngay tại đây sẽ gây
+    // DEADLOCK, làm treo mọi thao tác login/logout sau đó (bug "không cho đăng
+    // nhập"). Vì vậy phần dùng DB phải đẩy sang setTimeout(0) để chạy SAU khi
+    // lock đã được nhả.
+    if (!currentUser) {
+      applyLoggedOutUI();
     } else {
-      // Show landing, hide app
-      document.body.classList.add("logged-out");
-      document.body.classList.remove("logged-in", "pending-approval");
-
-      // Reset variables
-      userRole = "student";
-      authText.textContent = "Đăng nhập";
-      authIcon.textContent = "👤";
-
-      // Hide tabs
-      tabClassroom.classList.add("hidden");
-      tabAdmin.classList.add("hidden");
-
-      // Reload local storage progress
-      reloadLocalProgress();
+      setTimeout(() => applyLoggedInUI(), 0);
     }
   });
+}
+
+// Trạng thái đăng xuất — thuần local, an toàn gọi ngay trong callback
+function applyLoggedOutUI() {
+  document.body.classList.add("logged-out");
+  document.body.classList.remove("logged-in", "pending-approval");
+  userRole = "student";
+  const authText = document.getElementById("authText");
+  const authIcon = document.getElementById("authIcon");
+  if (authText) authText.textContent = "Đăng nhập";
+  if (authIcon) authIcon.textContent = "👤";
+  document.getElementById("tabClassroom").classList.add("hidden");
+  document.getElementById("tabAdmin").classList.add("hidden");
+  reloadLocalProgress();
+}
+
+// Trạng thái đăng nhập — có gọi DB, chạy ngoài lock (qua setTimeout)
+async function applyLoggedInUI() {
+  if (!currentUser) return; // có thể đã đăng xuất trong lúc chờ
+  const uid = currentUser.id;
+  const authText = document.getElementById("authText");
+  const authIcon = document.getElementById("authIcon");
+  const tabClassroom = document.getElementById("tabClassroom");
+  const tabAdmin = document.getElementById("tabAdmin");
+
+  let profile = null;
+  try {
+    const { data } = await supabaseClient.from("mathenglish_profiles").select("role, approved").eq("id", uid).single();
+    profile = data;
+  } catch (e) { console.error("fetch profile failed:", e); }
+  if (!currentUser || currentUser.id !== uid) return; // user đã đổi trong lúc chờ
+
+  userRole = profile ? profile.role : "student";
+  const approved = profile ? (profile.approved === true || profile.role === "admin") : false;
+
+  if (!approved) {
+    document.body.classList.remove("logged-out", "logged-in");
+    document.body.classList.add("pending-approval");
+    const pn = document.getElementById("pendingName");
+    if (pn) pn.textContent = currentUser.user_metadata?.full_name || currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
+    return;
+  }
+
+  document.body.classList.remove("logged-out", "pending-approval");
+  document.body.classList.add("logged-in");
+  authText.textContent = currentUser.user_metadata?.full_name || currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
+  authText.style.maxWidth = "110px";
+  authText.style.overflow = "hidden";
+  authText.style.textOverflow = "ellipsis";
+  authText.style.whiteSpace = "nowrap";
+  authIcon.textContent = userRole === "admin" ? "🛠️" : userRole === "teacher" ? "🎓" : "👦";
+  tabClassroom.classList.toggle("hidden", userRole !== "teacher" && userRole !== "admin");
+  tabAdmin.classList.toggle("hidden", userRole !== "admin");
+  try { await loadCloudProgress(); } catch (e) { console.error("loadCloudProgress failed:", e); }
 }
 
 // Load learning data from Supabase
