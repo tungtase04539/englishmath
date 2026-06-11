@@ -887,8 +887,9 @@ function setupAuthListeners() {
       tabClassroom.classList.toggle("hidden", userRole !== "teacher" && userRole !== "admin");
       tabAdmin.classList.toggle("hidden", userRole !== "admin");
 
-      // Load and apply cloud progress
-      await loadCloudProgress();
+      // Load and apply cloud progress (must not throw — an error here would
+      // leave Supabase's auth lock stuck and break logout/login afterwards)
+      try { await loadCloudProgress(); } catch (e) { console.error("loadCloudProgress failed:", e); }
     } else {
       // Show landing, hide app
       document.body.classList.add("logged-out");
@@ -928,7 +929,7 @@ async function loadCloudProgress() {
       gd.streak = prog.streak || 0;
       gd.lastDay = prog.last_day;
       gd.badges = prog.badges || [];
-      window.Game.save();
+      localStorage.setItem("mathenglish_game_v1", JSON.stringify(gd));
       window.Game.updateHUD();
       window.Game.checkBadges();
     }
