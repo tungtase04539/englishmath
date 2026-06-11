@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/screens.css" />
 </head>
-<body>
+<body class="logged-out">
   <!-- ===== TOP APP BAR + HUD ===== -->
   <header class="appbar">
     <div class="brand">
@@ -20,6 +20,9 @@
     </div>
     <div class="hud">
       <button id="soundToggle" class="hud-chip" title="Bật/tắt âm thanh" style="cursor:pointer">🔊</button>
+      <div id="authChip" class="hud-chip auth-chip" title="Tài khoản" style="cursor:pointer">
+        <span id="authIcon">👤</span><span id="authText">Đăng nhập</span>
+      </div>
       <div id="streakChip" class="hud-chip hud-streak" title="Chuỗi ngày học liên tiếp">
         <span class="ic">🔥</span><span id="streakVal">0</span>
       </div>
@@ -32,6 +35,50 @@
       </div>
     </div>
   </header>
+
+  <!-- ===== LANDING / GIỚI THIỆU (hiện khi chưa đăng nhập) ===== -->
+  <div id="landing">
+    <section class="lp-hero">
+      <div class="lp-hero-badge">📐 MathEnglish</div>
+      <h1 class="lp-title">Học tiếng Anh Toán học <span>vui như chơi game</span></h1>
+      <p class="lp-sub">Nắm vững từ vựng &amp; ngôn ngữ Toán bằng tiếng Anh cho học sinh lớp 6–7, luyện thi <b>IKMC (Kangaroo)</b> &amp; <b>AMC 8</b>. Học mỗi ngày, lên cấp, mở khoá huy hiệu!</p>
+      <div class="lp-cta">
+        <button class="btn btn-primary lp-btn-lg" id="landingLogin">🔑 Đăng nhập để bắt đầu</button>
+        <button class="btn lp-btn-ghost" id="landingSignup">📝 Tạo tài khoản miễn phí</button>
+      </div>
+      <div class="lp-mascot">🎓</div>
+    </section>
+
+    <section class="lp-section">
+      <h2 class="lp-h2">✨ Tính năng nổi bật</h2>
+      <div class="lp-grid">
+        <div class="lp-card"><div class="lp-ic">📖</div><h3>Tra từ vựng</h3><p>Hơn 100 từ Toán học tiếng Anh kèm phiên âm IPA, nghĩa, ví dụ và nút nghe phát âm chuẩn.</p></div>
+        <div class="lp-card"><div class="lp-ic">🃏</div><h3>Flashcard</h3><p>Lật thẻ ghi nhớ từ vựng theo chủ đề, đánh dấu "đã thuộc" để nhận điểm kinh nghiệm.</p></div>
+        <div class="lp-card"><div class="lp-ic">✏️</div><h3>Quiz trắc nghiệm</h3><p>Kiểm tra nhanh kiến thức, trả lời đúng được cộng XP và hiệu ứng pháo hoa vui nhộn.</p></div>
+        <div class="lp-card"><div class="lp-ic">🎤</div><h3>Luyện nói</h3><p>Đọc to và được chấm điểm phát âm theo từng âm tiết, cải thiện khả năng nói tự tin.</p></div>
+        <div class="lp-card"><div class="lp-ic">📚</div><h3>Bài đọc hiểu</h3><p>Đọc các đoạn văn Toán học bằng tiếng Anh, bấm vào từ tô màu để nghe và học nghĩa.</p></div>
+        <div class="lp-card"><div class="lp-ic">📝</div><h3>Giải đề Toán</h3><p>Thử sức với đề thi quốc tế IKMC, AMC 8 và xem điểm số tiến bộ qua từng lần làm.</p></div>
+      </div>
+    </section>
+
+    <section class="lp-section">
+      <h2 class="lp-h2">🎯 Vì sao chọn MathEnglish?</h2>
+      <div class="lp-benefits">
+        <div class="lp-benefit"><span class="lp-bic">🎮</span><div><b>Học mà chơi</b><p>Hệ thống XP, cấp độ, chuỗi ngày học (streak) và huy hiệu giúp giữ động lực mỗi ngày.</p></div></div>
+        <div class="lp-benefit"><span class="lp-bic">☁️</span><div><b>Lưu tiến độ đám mây</b><p>Đăng nhập một lần, tiến độ học được đồng bộ trên mọi thiết bị.</p></div></div>
+        <div class="lp-benefit"><span class="lp-bic">🏫</span><div><b>Dành cho lớp học</b><p>Giáo viên theo dõi tiến độ học sinh, quản trị viên quản lý tài khoản dễ dàng.</p></div></div>
+        <div class="lp-benefit"><span class="lp-bic">🏆</span><div><b>Bám sát kỳ thi</b><p>Từ vựng và đề luyện được chọn lọc theo chương trình IKMC &amp; AMC 8 lớp 6–7.</p></div></div>
+      </div>
+    </section>
+
+    <section class="lp-final">
+      <h2>Sẵn sàng chinh phục tiếng Anh Toán học? 🚀</h2>
+      <p>Đăng nhập để mở khoá toàn bộ tính năng và bắt đầu hành trình học tập của bạn.</p>
+      <button class="btn btn-primary lp-btn-lg" id="landingLogin2">🔑 Đăng nhập ngay</button>
+    </section>
+
+    <footer class="lp-footer">MathEnglish · Tiếng Anh Toán học · Lớp 6–7 · IKMC &amp; AMC 8</footer>
+  </div>
 
   <div class="container">
     <!-- ===== MASCOT ===== -->
@@ -61,6 +108,8 @@
       <button class="tab" data-tab="quiz">✏️ Quiz</button>
       <button class="tab" data-tab="speaking">🎤 Luyện nói</button>
       <button class="tab" data-tab="reading">📚 Bài đọc</button>
+      <button class="tab hidden" id="tabClassroom" data-tab="classroom">🏫 Lớp học</button>
+      <button class="tab hidden" id="tabAdmin" data-tab="adminPanel">🛠️ Quản trị</button>
     </nav>
 
     <main>
@@ -192,10 +241,107 @@
         <div id="learnedList" class="chips"></div>
         <button id="resetProgress" class="btn btn-danger">🗑️ Xóa toàn bộ tiến độ</button>
       </section>
+
+      <!-- LỚP HỌC (TEACHER/ADMIN ONLY) -->
+      <section id="classroom" class="panel">
+        <h2>🏫 Quản lý lớp học</h2>
+        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Xem danh sách học sinh và tiến độ học tập của các em.</p>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Học sinh</th>
+                <th>Cấp độ</th>
+                <th>XP</th>
+                <th>Từ đã thuộc</th>
+                <th>Lượt Quiz</th>
+                <th>Phát âm tốt (>=80%)</th>
+                <th>Đề đã giải</th>
+              </tr>
+            </thead>
+            <tbody id="studentList">
+              <tr><td colspan="7" class="empty-note">Đang tải danh sách học sinh...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- QUẢN TRỊ (ADMIN ONLY) -->
+      <section id="adminPanel" class="panel">
+        <h2>🛠️ Bảng quản trị</h2>
+        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Quản lý phân quyền người dùng (Học sinh, Giáo viên, Admin).</p>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Họ tên</th>
+                <th>Vai trò hiện tại</th>
+                <th>Thay đổi vai trò</th>
+              </tr>
+            </thead>
+            <tbody id="userList">
+              <tr><td colspan="4" class="empty-note">Đang tải danh sách người dùng...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   </div>
 
   <footer class="app-footer">Phát âm: Free Dictionary API · dự phòng giọng đọc trình duyệt · Học vui mỗi ngày! 🌟</footer>
+
+  <!-- ===== AUTH MODAL ===== -->
+  <div id="authModal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeAuthModal" class="close">&times;</span>
+      
+      <!-- Login View -->
+      <div id="loginView" class="auth-view">
+        <h2>🔑 Đăng nhập</h2>
+        <form id="loginForm">
+          <label>Email</label>
+          <input type="email" id="loginEmail" required placeholder="nhap@email.com" />
+          <label>Mật khẩu</label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" />
+          <button type="submit" class="btn btn-primary" style="margin-top:10px">Đăng nhập</button>
+        </form>
+        <p class="auth-switch">Chưa có tài khoản? <a href="#" id="toSignup">Đăng ký ngay</a></p>
+      </div>
+
+      <!-- Signup View -->
+      <div id="signupView" class="auth-view hidden">
+        <h2>📝 Đăng ký tài khoản</h2>
+        <form id="signupForm">
+          <label>Họ và tên</label>
+          <input type="text" id="signupName" required placeholder="Nguyễn Văn A" />
+          <label>Email</label>
+          <input type="email" id="signupEmail" required placeholder="nhap@email.com" />
+          <label>Mật khẩu</label>
+          <input type="password" id="signupPassword" required placeholder="Tối thiểu 6 ký tự" minlength="6" />
+          <label>Vai trò (Role)</label>
+          <select id="signupRole" style="width:100%;margin-bottom:14px">
+            <option value="student">Học sinh (Student)</option>
+            <option value="teacher">Giáo viên (Teacher)</option>
+            <option value="admin">Quản trị viên (Admin)</option>
+          </select>
+          <button type="submit" class="btn btn-primary" style="margin-top:10px">Đăng ký</button>
+        </form>
+        <p class="auth-switch">Đã có tài khoản? <a href="#" id="toLogin">Đăng nhập</a></p>
+      </div>
+
+      <!-- User Dashboard (Logged in view) -->
+      <div id="userProfileView" class="auth-view hidden">
+        <h2>👤 Thông tin tài khoản</h2>
+        <div class="profile-info">
+          <p><strong>Họ tên:</strong> <span id="profileName"></span></p>
+          <p><strong>Email:</strong> <span id="profileEmail"></span></p>
+          <p><strong>Vai trò:</strong> <span id="profileRole" class="badge-role"></span></p>
+        </div>
+        <button id="logoutBtn" class="btn btn-danger" style="margin-top:16px;width:100%">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toastWrap"></div>
   <canvas id="confetti"></canvas>
@@ -203,6 +349,7 @@
   <script src="data/vocab.js"></script>
   <script src="data/readings.js"></script>
   <script src="data/exams.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/gamify.js"></script>
   <script src="js/app.js"></script>
 </body>

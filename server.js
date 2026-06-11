@@ -9,10 +9,13 @@ const PORT = process.env.PORT || 5500;
 const ROOT = __dirname;
 
 // Đọc cấu hình Speechace từ speechace.config.json (KHÔNG chia sẻ file này cho ai)
-let CFG = { key: "", endpoint: "https://api2.speechace.com", dialect: "en-us" };
+let CFG = { key: "", endpoint: "https://api2.speechace.com", dialect: "en-us", supabaseUrl: "", supabaseKey: "" };
 try {
   CFG = Object.assign(CFG, JSON.parse(fs.readFileSync(path.join(ROOT, "speechace.config.json"), "utf8")));
 } catch (e) { console.warn("Chưa có speechace.config.json — /api/assess sẽ báo lỗi cho tới khi cấu hình."); }
+try {
+  CFG = Object.assign(CFG, JSON.parse(fs.readFileSync(path.join(ROOT, "supabase.config.json"), "utf8")));
+} catch (e) {}
 
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -98,6 +101,13 @@ http.createServer((req, res) => {
   if (req.url.startsWith("/api/health")) {
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true, speechace: !!CFG.key }));
+  }
+  if (req.url.startsWith("/api/config")) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({
+      supabaseUrl: process.env.SUPABASE_URL || CFG.supabaseUrl || "",
+      supabaseKey: process.env.SUPABASE_ANON_KEY || CFG.supabaseKey || ""
+    }));
   }
   if (req.url.startsWith("/api/assess") && req.method === "POST") return handleAssess(req, res);
   serveStatic(req, res);

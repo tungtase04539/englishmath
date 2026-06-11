@@ -119,12 +119,25 @@ document.getElementById("modeSwitch").addEventListener("click", e => {
 document.getElementById("tabs").addEventListener("click", e => {
   const btn = e.target.closest(".tab"); if (!btn) return;
   document.querySelectorAll("#tabs .tab").forEach(t => t.classList.remove("active"));
-  ENGLISH_TABS.forEach(id => document.getElementById(id).classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
   btn.classList.add("active");
   document.getElementById(btn.dataset.tab).classList.add("active");
   G() && G().sound.click();
-  G() && G().mascotSay(MASCOT_MSG[btn.dataset.tab]);
+  if (MASCOT_MSG[btn.dataset.tab]) {
+    G() && G().mascotSay(MASCOT_MSG[btn.dataset.tab]);
+  } else if (btn.dataset.tab === "classroom") {
+    G() && G().mascotSay("Chào thầy/cô! Chúc thầy/cô quản lý lớp học thật hiệu quả! 🏫");
+  } else if (btn.dataset.tab === "adminPanel") {
+    G() && G().mascotSay("Trang quản trị hệ thống. Hãy cẩn thận khi thay đổi vai trò! 🛠️");
+  }
+
+  if (btn.dataset.tab === "classroom" && typeof renderClassroom === "function") {
+    renderClassroom();
+  } else if (btn.dataset.tab === "adminPanel" && typeof renderAdminPanel === "function") {
+    renderAdminPanel();
+  }
 });
+
 
 // ---------- Utilities ----------
 const topics = [...new Set(VOCAB.map(v => v.topic))];
@@ -693,3 +706,396 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 // init may run after DOMContentLoaded already fired
 if (window.Game) { window.Game.init(); const st = document.getElementById("soundToggle"); if (st) st.textContent = window.Game.soundOn() ? "🔊" : "🔇"; }
+
+// ============================================================
+// SUPABASE ROLE-BASED AUTH & DATABASE SYNCING
+// ============================================================
+let supabaseClient = null;
+let currentUser = null;
+let userRole = "student";
+
+// Supabase public credentials (anon key — safe to expose in frontend)
+const SUPABASE_URL = "https://dayqsblxlmczwgynmogf.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRheXFzYmx4bG1jendneW5tb2dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNjE2NjUsImV4cCI6MjA3ODkzNzY2NX0.aO6dXxMookmBqjzbw-FbVmRpJI8e4STK6eO9PTAaXwg";
+
+async function initSupabase() {
+  try {
+    if (!window.supabase) {
+      console.warn("Supabase SDK not loaded. Auth system disabled.");
+      return;
+    }
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    setupAuthListeners();
+    setupAuthUI();
+  } catch (e) {
+    console.error("Failed to initialize Supabase:", e);
+  }
+}
+
+// Bind auth buttons and modal views
+function setupAuthUI() {
+  const modal = document.getElementById("authModal");
+  const authChip = document.getElementById("authChip");
+  const closeBtn = document.getElementById("closeAuthModal");
+  
+  const toSignup = document.getElementById("toSignup");
+  const toLogin = document.getElementById("toLogin");
+  
+  const loginView = document.getElementById("loginView");
+  const signupView = document.getElementById("signupView");
+  const profileView = document.getElementById("userProfileView");
+  
+  const loginForm = document.getElementById("loginForm");
+  const signupForm = document.getElementById("signupForm");
+  const logoutBtn = document.getElementById("logoutBtn");
+  
+  // Show / hide modal
+  authChip.onclick = () => {
+    modal.classList.remove("hidden");
+    showAuthView();
+  };
+
+  // Landing page CTA buttons → open auth modal
+  const openLogin = () => { modal.classList.remove("hidden"); showAuthView(); };
+  const openSignup = () => {
+    modal.classList.remove("hidden");
+    profileView.classList.add("hidden");
+    loginView.classList.add("hidden");
+    signupView.classList.remove("hidden");
+  };
+  ["landingLogin", "landingLogin2"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.onclick = openLogin;
+  });
+  const signupBtn = document.getElementById("landingSignup");
+  if (signupBtn) signupBtn.onclick = openSignup;
+  closeBtn.onclick = () => {
+    modal.classList.add("hidden");
+  };
+  window.onclick = (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  };
+
+  // Switch between views
+  toSignup.onclick = (e) => {
+    e.preventDefault();
+    loginView.classList.add("hidden");
+    signupView.classList.remove("hidden");
+  };
+  toLogin.onclick = (e) => {
+    e.preventDefault();
+    signupView.classList.add("hidden");
+    loginView.classList.remove("hidden");
+  };
+
+  function showAuthView() {
+    loginView.classList.add("hidden");
+    signupView.classList.add("hidden");
+    profileView.classList.add("hidden");
+    
+    if (currentUser) {
+      document.getElementById("profileName").textContent = currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
+      document.getElementById("profileEmail").textContent = currentUser.email;
+      const rEl = document.getElementById("profileRole");
+      rEl.textContent = userRole === "admin" ? "Quản trị viên" : userRole === "teacher" ? "Giáo viên" : "Học sinh";
+      rEl.className = "badge-role " + userRole;
+      profileView.classList.remove("hidden");
+    } else {
+      loginView.classList.remove("hidden");
+    }
+  }
+
+  // Handle forms
+  loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPassword").value;
+    
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      alert("Đăng nhập thất bại: " + error.message);
+    } else {
+      modal.classList.add("hidden");
+      G() && G().toast("🔑", "Đăng nhập", "Đăng nhập thành công!", "#16c47f");
+    }
+  };
+
+  signupForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("signupName").value;
+    const email = document.getElementById("signupEmail").value;
+    const pass = document.getElementById("signupPassword").value;
+    const role = document.getElementById("signupRole").value;
+
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: {
+          full_name: name,
+          role: role
+        }
+      }
+    });
+
+    if (error) {
+      alert("Đăng ký thất bại: " + error.message);
+    } else {
+      alert("Đăng ký tài khoản thành công! Bạn có thể sử dụng tài khoản này.");
+      modal.classList.add("hidden");
+      G() && G().toast("📝", "Đăng ký", "Đăng ký thành công!", "#16c47f");
+    }
+  };
+
+  logoutBtn.onclick = async () => {
+    await supabaseClient.auth.signOut();
+    modal.classList.add("hidden");
+    G() && G().toast("👋", "Đăng xuất", "Đã đăng xuất tài khoản", "#ff5d73");
+  };
+}
+
+// Watch Auth state changes
+function setupAuthListeners() {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    currentUser = session ? session.user : null;
+    const authText = document.getElementById("authText");
+    const authIcon = document.getElementById("authIcon");
+    const tabClassroom = document.getElementById("tabClassroom");
+    const tabAdmin = document.getElementById("tabAdmin");
+
+    if (currentUser) {
+      // Reveal app, hide landing
+      document.body.classList.remove("logged-out");
+      document.body.classList.add("logged-in");
+
+      // Fetch role
+      const { data: profile, error } = await supabaseClient.from("mathenglish_profiles").select("role").eq("id", currentUser.id).single();
+      if (!error && profile) {
+        userRole = profile.role;
+      } else {
+        userRole = "student";
+      }
+
+      // Update auth chip UI
+      authText.textContent = currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
+      authText.style.maxWidth = "110px";
+      authText.style.overflow = "hidden";
+      authText.style.textOverflow = "ellipsis";
+      authText.style.whiteSpace = "nowrap";
+      authIcon.textContent = userRole === "admin" ? "🛠️" : userRole === "teacher" ? "🎓" : "👦";
+
+      // Show role-based tabs
+      tabClassroom.classList.toggle("hidden", userRole !== "teacher" && userRole !== "admin");
+      tabAdmin.classList.toggle("hidden", userRole !== "admin");
+
+      // Load and apply cloud progress
+      await loadCloudProgress();
+    } else {
+      // Show landing, hide app
+      document.body.classList.add("logged-out");
+      document.body.classList.remove("logged-in");
+
+      // Reset variables
+      userRole = "student";
+      authText.textContent = "Đăng nhập";
+      authIcon.textContent = "👤";
+
+      // Hide tabs
+      tabClassroom.classList.add("hidden");
+      tabAdmin.classList.add("hidden");
+
+      // Reload local storage progress
+      reloadLocalProgress();
+    }
+  });
+}
+
+// Load learning data from Supabase
+async function loadCloudProgress() {
+  if (!supabaseClient || !currentUser) return;
+  const { data: prog, error } = await supabaseClient.from("mathenglish_progress").select("*").eq("user_id", currentUser.id).single();
+  if (!error && prog) {
+    // Sync store.data (vocabulary, quizzes, speaking, exams)
+    store.data.learned = prog.learned || [];
+    store.data.quizzes = prog.quizzes || [];
+    store.data.speaking = prog.speaking || {};
+    store.data.exams = prog.exams || [];
+    localStorage.setItem(STORE_KEY, JSON.stringify(store.data));
+
+    // Sync Game.data (XP, level, streak, badges)
+    if (window.Game) {
+      const gd = window.Game.data;
+      gd.xp = prog.xp || 0;
+      gd.streak = prog.streak || 0;
+      gd.lastDay = prog.last_day;
+      gd.badges = prog.badges || [];
+      window.Game.save();
+      window.Game.updateHUD();
+      window.Game.checkBadges();
+    }
+
+    // Refresh current UI view
+    const activeTab = document.querySelector("#tabs .tab.active")?.dataset.tab;
+    const activeMode = document.querySelector(".mode-btn.active")?.dataset.mode;
+    if (activeMode === "progress") {
+      renderProgress();
+    } else if (activeTab === "dictionary") {
+      renderDictionary();
+    } else if (activeTab === "flashcard") {
+      buildDeck();
+    } else if (activeTab === "speaking") {
+      buildSpeakDeck();
+    }
+  }
+}
+
+// Reload from local storage when logging out
+function reloadLocalProgress() {
+  store.data = Object.assign(
+    { learned: [], quizzes: [], speaking: {}, exams: [] },
+    JSON.parse(localStorage.getItem(STORE_KEY) || "{}")
+  );
+  
+  if (window.Game) {
+    const GKEY = "mathenglish_game_v1";
+    window.Game.data = Object.assign(
+      { xp: 0, streak: 0, lastDay: null, badges: [], sound: true, quizPerfect: 0, examPass: 0 },
+      JSON.parse(localStorage.getItem(GKEY) || "{}")
+    );
+    window.Game.updateHUD();
+  }
+
+  // Refresh view
+  const activeTab = document.querySelector("#tabs .tab.active")?.dataset.tab;
+  const activeMode = document.querySelector(".mode-btn.active")?.dataset.mode;
+  if (activeMode === "progress") {
+    renderProgress();
+  } else if (activeTab === "dictionary") {
+    renderDictionary();
+  } else if (activeTab === "flashcard") {
+    buildDeck();
+  } else if (activeTab === "speaking") {
+    buildSpeakDeck();
+  }
+}
+
+// Save local changes to Supabase cloud
+async function syncToSupabase() {
+  if (!supabaseClient || !currentUser) return;
+  const data = {
+    learned: store.data.learned,
+    quizzes: store.data.quizzes,
+    speaking: store.data.speaking,
+    exams: store.data.exams,
+    xp: window.Game?.data.xp || 0,
+    streak: window.Game?.data.streak || 0,
+    last_day: window.Game?.data.lastDay || null,
+    badges: window.Game?.data.badges || [],
+    updated_at: new Date().toISOString()
+  };
+  await supabaseClient.from("mathenglish_progress").update(data).eq("user_id", currentUser.id);
+}
+window.syncToSupabase = syncToSupabase;
+
+// Redefine store.save to support cloud syncing
+const originalStoreSave = store.save;
+store.save = function() {
+  originalStoreSave.call(store);
+  if (window.syncToSupabase) window.syncToSupabase();
+};
+
+// Classroom page rendering logic
+async function renderClassroom() {
+  const tbody = document.getElementById("studentList");
+  tbody.innerHTML = `<tr><td colspan="7" class="empty-note">Đang tải danh sách học sinh...</td></tr>`;
+  try {
+    const { data: students, error: err1 } = await supabaseClient.from('mathenglish_profiles').select('id, full_name').eq('role', 'student');
+    if (err1) throw err1;
+    const { data: progress, error: err2 } = await supabaseClient.from('mathenglish_progress').select('*');
+    if (err2) throw err2;
+    
+    const progMap = Object.fromEntries(progress.map(p => [p.user_id, p]));
+    if (!students.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-note">Chưa có học sinh nào.</td></tr>`;
+      return;
+    }
+    
+    tbody.innerHTML = students.map(s => {
+      const p = progMap[s.id] || { xp: 0, learned: [], quizzes: [], speaking: {}, exams: [] };
+      let currentLvl = 1;
+      while (50 * currentLvl * (currentLvl + 1) <= p.xp) currentLvl++;
+      
+      const speakVals = Object.values(p.speaking || {});
+      const speakGood = speakVals.filter(v => v >= 80).length;
+      const speakTotal = speakVals.length;
+
+      return `
+        <tr>
+          <td><b>${esc(s.full_name)}</b></td>
+          <td><span class="badge-role student">Cấp ${currentLvl}</span></td>
+          <td>⭐ ${p.xp}</td>
+          <td>📚 ${p.learned ? p.learned.length : 0} từ</td>
+          <td>✏️ ${p.quizzes ? p.quizzes.length : 0} lượt</td>
+          <td>🎤 ${speakGood}/${speakTotal} từ</td>
+          <td>🏆 ${p.exams ? p.exams.length : 0} đề</td>
+        </tr>
+      `;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-note" style="color:var(--coral)">Lỗi: ${e.message}</td></tr>`;
+  }
+}
+
+// Admin Panel rendering logic
+async function renderAdminPanel() {
+  const tbody = document.getElementById("userList");
+  tbody.innerHTML = `<tr><td colspan="4" class="empty-note">Đang tải danh sách người dùng...</td></tr>`;
+  try {
+    const { data: users, error } = await supabaseClient.from('mathenglish_profiles').select('*').order('role', { ascending: true });
+    if (error) throw error;
+    
+    tbody.innerHTML = users.map(u => {
+      const isMe = u.id === currentUser.id;
+      return `
+        <tr>
+          <td>${esc(u.email || "N/A")}</td>
+          <td><b>${esc(u.full_name || "N/A")}</b></td>
+          <td><span class="badge-role ${u.role}">${u.role}</span></td>
+          <td>
+            <select class="change-role-select" data-uid="${u.id}" ${isMe ? 'disabled' : ''}>
+              <option value="student" ${u.role === 'student' ? 'selected' : ''}>Student</option>
+              <option value="teacher" ${u.role === 'teacher' ? 'selected' : ''}>Teacher</option>
+              <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-note" style="color:var(--coral)">Lỗi: ${e.message}</td></tr>`;
+  }
+}
+
+// Bind admin panel change role select
+document.getElementById("adminPanel").addEventListener("change", async (e) => {
+  const sel = e.target.closest(".change-role-select");
+  if (!sel) return;
+  const uid = sel.dataset.uid;
+  const newRole = sel.value;
+  
+  if (confirm(`Bạn muốn thay đổi vai trò của người dùng này thành ${newRole.toUpperCase()}?`)) {
+    const { error } = await supabaseClient.from("mathenglish_profiles").update({ role: newRole }).eq("id", uid);
+    if (error) {
+      alert("Lỗi: " + error.message);
+      renderAdminPanel();
+    } else {
+      G() && G().toast("⚙️", "Admin", "Đã cập nhật vai trò!", "#16c47f");
+      renderAdminPanel();
+    }
+  } else {
+    renderAdminPanel();
+  }
+});
+
+// Kick off Supabase setup
+initSupabase();
+

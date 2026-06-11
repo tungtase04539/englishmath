@@ -11,7 +11,12 @@
       { xp: 0, streak: 0, lastDay: null, badges: [], sound: true, quizPerfect: 0, examPass: 0 },
       JSON.parse(localStorage.getItem(GKEY) || "{}")
     ),
-    save() { localStorage.setItem(GKEY, JSON.stringify(this.data)); }
+    save() {
+      localStorage.setItem(GKEY, JSON.stringify(this.data));
+      if (typeof window !== "undefined" && window.syncToSupabase) {
+        window.syncToSupabase();
+      }
+    }
   };
 
   // ---------- Levels ----------
