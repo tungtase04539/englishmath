@@ -1,0 +1,5 @@
+{
+  "key": "YOUR_SPEECHACE_API_KEY_HERE",
+  "endpoint": "https://api2.speechace.com",
+  "dialect": "en-us"
+}

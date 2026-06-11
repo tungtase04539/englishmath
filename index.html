@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MathEnglish — Học tiếng Anh Toán học vui vẻ</title>
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/screens.css" />
+</head>
+<body>
+  <!-- ===== TOP APP BAR + HUD ===== -->
+  <header class="appbar">
+    <div class="brand">
+      <div class="brand-logo">📐</div>
+      <div>
+        <div class="brand-name">Math<span>English</span></div>
+        <div class="brand-sub">Tiếng Anh Toán học · Lớp 6–7 · IKMC &amp; AMC 8</div>
+      </div>
+    </div>
+    <div class="hud">
+      <button id="soundToggle" class="hud-chip" title="Bật/tắt âm thanh" style="cursor:pointer">🔊</button>
+      <div id="streakChip" class="hud-chip hud-streak" title="Chuỗi ngày học liên tiếp">
+        <span class="ic">🔥</span><span id="streakVal">0</span>
+      </div>
+      <div class="hud-level" id="lvlChip" title="Cấp độ &amp; kinh nghiệm">
+        <svg width="46" height="46" viewBox="0 0 46 46">
+          <circle class="ring-bg" cx="23" cy="23" r="20" fill="none" stroke-width="5"></circle>
+          <circle class="ring-fill" id="lvlRing" cx="23" cy="23" r="20" fill="none" stroke-width="5" stroke-dasharray="125.6" stroke-dashoffset="125.6" transform="rotate(-90 23 23)"></circle>
+        </svg>
+        <span class="lvl-num" id="lvlNum">1</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- ===== MASCOT ===== -->
+    <div class="mascot-row">
+      <div class="mascot" id="mascot">
+        <div class="body">
+          <span class="cap">🎓</span>
+          <span class="eye l"></span><span class="eye r"></span>
+          <span class="cheek l"></span><span class="cheek r"></span>
+          <span class="mouth"></span>
+        </div>
+      </div>
+      <div class="mascot-bubble" id="mascotBubble">Chào bạn! Cùng chinh phục tiếng Anh Toán học nào! 🚀</div>
+    </div>
+
+    <!-- ===== MODE SWITCH ===== -->
+    <nav class="mode-switch" id="modeSwitch">
+      <button class="mode-btn active" data-mode="english"><span class="mode-ic">📚</span><span class="mode-tx"><b>Luyện tiếng Anh</b></span></button>
+      <button class="mode-btn" data-mode="exam"><span class="mode-ic">📝</span><span class="mode-tx"><b>Giải đề Toán</b></span></button>
+      <button class="mode-btn" data-mode="progress"><span class="mode-ic">📊</span><span class="mode-tx"><b>Tiến độ</b></span></button>
+    </nav>
+
+    <!-- ===== ACTIVITY TABS ===== -->
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="dictionary">📖 Tra từ</button>
+      <button class="tab" data-tab="flashcard">🃏 Flashcard</button>
+      <button class="tab" data-tab="quiz">✏️ Quiz</button>
+      <button class="tab" data-tab="speaking">🎤 Luyện nói</button>
+      <button class="tab" data-tab="reading">📚 Bài đọc</button>
+    </nav>
+
+    <main>
+      <!-- TRA TỪ -->
+      <section id="dictionary" class="panel active">
+        <div class="toolbar">
+          <input type="search" id="searchBox" placeholder="🔍 Tìm từ vựng..." />
+          <select id="topicFilter"></select>
+        </div>
+        <div id="wordList" class="word-grid"></div>
+      </section>
+
+      <!-- FLASHCARD -->
+      <section id="flashcard" class="panel">
+        <div class="flashcard-controls">
+          <select id="flashTopic"></select>
+          <span id="flashCounter" class="counter"></span>
+        </div>
+        <div id="flashcard-card" class="flashcard">
+          <div class="flashcard-inner">
+            <div class="flashcard-front"></div>
+            <div class="flashcard-back"></div>
+          </div>
+        </div>
+        <div class="flash-nav">
+          <button id="flashPrev" class="btn">← Trước</button>
+          <button id="flashKnown" class="btn btn-green">✓ Đã thuộc</button>
+          <button id="flashNext" class="btn">Sau →</button>
+        </div>
+      </section>
+
+      <!-- QUIZ -->
+      <section id="quiz" class="panel">
+        <div id="quizSetup" class="panel-intro">
+          <h2>✏️ Kiểm tra từ vựng</h2>
+          <p style="color:var(--ink-soft);font-weight:700;margin:6px 0 16px">Chọn chủ đề và bắt đầu làm bài (10 câu). Trả lời đúng để nhận XP!</p>
+          <div class="toolbar"><select id="quizTopic"></select><button id="quizStart" class="btn btn-primary">🚀 Bắt đầu</button></div>
+        </div>
+        <div id="quizPlay" class="hidden">
+          <div class="quiz-head"><span id="quizProgress" class="counter"></span><span id="quizScore" class="counter"></span></div>
+          <div class="quiz-bar"><div id="quizBarFill" style="width:0%"></div></div>
+          <div id="quizQuestion" class="quiz-question"></div>
+          <div id="quizOptions" class="quiz-options"></div>
+          <button id="quizNext" class="btn btn-primary hidden" style="margin-top:16px">Câu tiếp →</button>
+        </div>
+        <div id="quizResult" class="hidden"></div>
+      </section>
+
+      <!-- LUYỆN NÓI -->
+      <section id="speaking" class="panel">
+        <div class="speaking-controls">
+          <select id="speakTopic"></select>
+          <span id="speakCounter" class="counter"></span>
+        </div>
+        <div id="speakUnsupported" class="hidden notice">
+          ⚠️ Trình duyệt này không hỗ trợ nhận diện giọng nói. Hãy dùng <b>Google Chrome</b> hoặc <b>Microsoft Edge</b> (cần kết nối mạng và cho phép micro).
+        </div>
+        <div id="speakBox" class="speak-practice">
+          <div class="sp-word"></div>
+          <div class="sp-ipa"></div>
+          <div class="sp-vi"></div>
+          <div class="sp-actions">
+            <button id="spListen" class="btn btn-sky">🔊 Nghe mẫu</button>
+            <button id="spRecord" class="btn btn-danger" style="margin-top:0">🎤 Đọc lại</button>
+          </div>
+          <div id="spStatus" class="sp-status"></div>
+          <div id="spFeedback" class="sp-feedback"></div>
+          <div class="flash-nav" style="margin-top:16px">
+            <button id="spPrev" class="btn">← Từ trước</button>
+            <button id="spNext" class="btn">Từ sau →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- BÀI ĐỌC -->
+      <section id="reading" class="panel">
+        <div id="readingList" class="reading-list"></div>
+        <div id="readingView" class="hidden"></div>
+      </section>
+
+      <!-- GIẢI ĐỀ -->
+      <section id="exam" class="panel">
+        <div id="examList" class="panel-intro">
+          <h2>📝 Giải đề thi</h2>
+          <p class="hint" style="text-align:left">10 đề luyện mô phỏng theo dạng IKMC (Kangaroo) &amp; IMC, lớp 6-7. Đề tiếng Anh kèm dịch và lời giải tiếng Việt.</p>
+          <div class="exam-controls"><select id="examFilter"></select></div>
+          <div id="examCards" class="exam-cards"></div>
+        </div>
+        <div id="examMode" class="hidden">
+          <button id="examBack1" class="btn btn-back">← Danh sách đề</button>
+          <h2 id="examModeTitle" style="margin-top:14px"></h2>
+          <div id="examModeMeta" class="exam-meta"></div>
+          <div class="exam-mode-cards">
+            <button class="exam-mode-card" data-mode="test"><div class="emc-icon">⏱️</div><div class="emc-title">Thi thử</div><div class="emc-desc">Tính giờ, làm hết rồi nộp bài và chấm điểm. Sát phòng thi.</div></button>
+            <button class="exam-mode-card" data-mode="practice"><div class="emc-icon">📚</div><div class="emc-title">Luyện từng câu</div><div class="emc-desc">Xem đáp án và lời giải ngay sau mỗi câu. Không tính giờ.</div></button>
+          </div>
+        </div>
+        <div id="examPlay" class="hidden">
+          <div class="exam-play-head">
+            <button id="examQuit" class="btn btn-back">← Thoát</button>
+            <span id="examTimer" class="exam-timer hidden">⏱️ 00:00</span>
+            <span id="examProgress" class="counter"></span>
+          </div>
+          <div id="examAll" class="exam-all"></div>
+          <div class="exam-nav"><button id="examSubmit" class="btn btn-green hidden">Nộp bài</button></div>
+        </div>
+        <div id="examResult" class="hidden"></div>
+      </section>
+
+      <!-- TIẾN ĐỘ -->
+      <section id="progress" class="panel">
+        <h2>📊 Tiến độ học tập</h2>
+        <div id="levelHero" class="level-hero"></div>
+        <div id="progressStats" class="stats-grid"></div>
+
+        <h3>🏆 Huy hiệu thành tích</h3>
+        <div id="badgeGrid" class="badge-grid"></div>
+
+        <h3>📈 Tiến độ theo chủ đề</h3>
+        <div id="topicProgress" class="topic-progress"></div>
+
+        <h3>🎤 Điểm phát âm từng từ</h3>
+        <div id="speakScores" class="speak-scores"></div>
+
+        <h3>✏️ Lịch sử quiz</h3>
+        <div id="quizHistory" class="quiz-history"></div>
+
+        <h3>📚 Từ đã thuộc</h3>
+        <div id="learnedList" class="chips"></div>
+        <button id="resetProgress" class="btn btn-danger">🗑️ Xóa toàn bộ tiến độ</button>
+      </section>
+    </main>
+  </div>
+
+  <footer class="app-footer">Phát âm: Free Dictionary API · dự phòng giọng đọc trình duyệt · Học vui mỗi ngày! 🌟</footer>
+
+  <div id="toastWrap"></div>
+  <canvas id="confetti"></canvas>
+
+  <script src="data/vocab.js"></script>
+  <script src="data/readings.js"></script>
+  <script src="data/exams.js"></script>
+  <script src="js/gamify.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

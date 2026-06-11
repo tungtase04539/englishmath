@@ -1,0 +1,9 @@
+# Bí mật — KHÔNG commit (chứa API key Speechace)
+speechace.config.json
+
+# Phụ thuộc / build
+node_modules/
+
+# Hệ điều hành
+Thumbs.db
+.DS_Store

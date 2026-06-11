@@ -1,0 +1,95 @@
+/* ============================================================
+   MathEnglish — Design system: tokens, fonts, base
+   Vibrant "learning game" theme · green / sky / sun palette
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900;1,600&display=swap');
+
+:root {
+  /* --- Brand palette (bright, high-contrast, friendly) --- */
+  --grass:        #16c47f;   /* primary green   */
+  --grass-deep:   #0ea968;
+  --grass-soft:   #e3f9ee;
+  --sky:          #2ba8f0;   /* secondary blue  */
+  --sky-deep:     #1487cf;
+  --sky-soft:     #e2f3fe;
+  --sun:          #ffcb2e;   /* accent yellow   */
+  --sun-deep:     #f2a900;
+  --sun-soft:     #fff5d6;
+  --grape:        #8b5cf6;   /* exams / vocab   */
+  --grape-deep:   #7338e6;
+  --grape-soft:   #f0e9ff;
+  --coral:        #ff5d73;   /* wrong / danger  */
+  --coral-deep:   #e83a55;
+  --coral-soft:   #ffe6ea;
+
+  /* --- Neutrals (cool-warm balanced, easy on the eyes) --- */
+  --bg:           #eef4f1;   /* app background  */
+  --bg-tint:      #f7faf8;
+  --card:         #ffffff;
+  --ink:          #1d2f38;   /* primary text    */
+  --ink-soft:     #435a66;
+  --muted:        #7d96a1;
+  --line:         #e6edea;
+  --line-strong:  #d2ddd8;
+
+  /* --- Radii --- */
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  /* --- Shadows (soft, slightly tinted) --- */
+  --sh-sm: 0 2px 6px rgba(29,47,56,.06);
+  --sh-md: 0 8px 22px rgba(29,47,56,.10);
+  --sh-lg: 0 18px 44px rgba(29,47,56,.16);
+  --sh-pop: 0 14px 34px rgba(22,196,127,.30);
+
+  /* --- Type --- */
+  --font-display: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, sans-serif;
+
+  /* --- Motion --- */
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font-body);
+  font-weight: 600;
+  background:
+    radial-gradient(1200px 600px at 12% -8%, var(--sky-soft), transparent 60%),
+    radial-gradient(1000px 560px at 92% 4%, var(--sun-soft), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+  padding-bottom: 92px;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 800; line-height: 1.15; letter-spacing: -.01em; }
+h2 { font-size: 1.6rem; }
+h3 { font-size: 1.2rem; margin: 22px 0 10px; }
+
+::selection { background: var(--grass); color: #fff; }
+
+/* Scrollbar */
+::-webkit-scrollbar { height: 8px; width: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Utility */
+.hidden { display: none !important; }
+.container { max-width: 960px; margin: 0 auto; padding: 18px 18px 40px; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .05ms !important; }
+}
