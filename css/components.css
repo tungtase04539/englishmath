@@ -116,10 +116,13 @@
 .tab:hover { transform: translateY(-2px); border-color: var(--line-strong); }
 .tab.active { color: #fff; border-color: transparent; box-shadow: var(--sh-md); }
 .tab[data-tab="dictionary"].active { background: var(--sky); }
+.tab[data-tab="study"].active { background: var(--grass-deep); }
 .tab[data-tab="flashcard"].active { background: var(--grape); }
 .tab[data-tab="quiz"].active { background: var(--grass); }
 .tab[data-tab="speaking"].active { background: var(--coral); }
 .tab[data-tab="reading"].active { background: var(--sun-deep); }
+.tab[data-tab="classroom"].active { background: var(--sky-deep); }
+.tab[data-tab="adminPanel"].active { background: var(--grape-deep); }
 
 /* ---------- Buttons (tactile 3D) ---------- */
 .btn {
