@@ -850,15 +850,15 @@ function setupAuthUI() {
     const name = document.getElementById("signupName").value;
     const email = document.getElementById("signupEmail").value;
     const pass = document.getElementById("signupPassword").value;
-    const role = document.getElementById("signupRole").value;
 
+    // Đăng ký công khai chỉ tạo tài khoản giáo viên (chờ admin duyệt)
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password: pass,
       options: {
         data: {
           full_name: name,
-          role: role
+          role: "teacher"
         }
       }
     });
@@ -866,9 +866,9 @@ function setupAuthUI() {
     if (error) {
       alert("Đăng ký thất bại: " + error.message);
     } else {
-      alert("Đăng ký tài khoản thành công! Bạn có thể sử dụng tài khoản này.");
+      alert("Đăng ký thành công! Tài khoản giáo viên của bạn đang chờ quản trị viên duyệt. Bạn sẽ vào được app sau khi được duyệt.");
       modal.classList.add("hidden");
-      G() && G().toast("📝", "Đăng ký", "Đăng ký thành công!", "#16c47f");
+      G() && G().toast("📝", "Đăng ký", "Chờ admin duyệt tài khoản", "#ffcb2e");
     }
   };
 
@@ -876,6 +876,11 @@ function setupAuthUI() {
     await supabaseClient.auth.signOut();
     modal.classList.add("hidden");
     G() && G().toast("👋", "Đăng xuất", "Đã đăng xuất tài khoản", "#ff5d73");
+  };
+
+  const pendingLogout = document.getElementById("pendingLogout");
+  if (pendingLogout) pendingLogout.onclick = async () => {
+    await supabaseClient.auth.signOut();
   };
 }
 
@@ -889,17 +894,23 @@ function setupAuthListeners() {
     const tabAdmin = document.getElementById("tabAdmin");
 
     if (currentUser) {
-      // Reveal app, hide landing
-      document.body.classList.remove("logged-out");
-      document.body.classList.add("logged-in");
+      // Fetch role + approval status
+      const { data: profile, error } = await supabaseClient.from("mathenglish_profiles").select("role, approved").eq("id", currentUser.id).single();
+      userRole = (!error && profile) ? profile.role : "student";
+      const approved = (!error && profile) ? (profile.approved === true || profile.role === "admin") : false;
 
-      // Fetch role
-      const { data: profile, error } = await supabaseClient.from("mathenglish_profiles").select("role").eq("id", currentUser.id).single();
-      if (!error && profile) {
-        userRole = profile.role;
-      } else {
-        userRole = "student";
+      // Cổng duyệt: chưa được duyệt → hiện màn chờ, không cho vào app
+      if (!approved) {
+        document.body.classList.remove("logged-out", "logged-in");
+        document.body.classList.add("pending-approval");
+        const pn = document.getElementById("pendingName");
+        if (pn) pn.textContent = currentUser.user_metadata?.full_name || currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
+        return;
       }
+
+      // Đã duyệt → vào app
+      document.body.classList.remove("logged-out", "pending-approval");
+      document.body.classList.add("logged-in");
 
       // Update auth chip UI
       authText.textContent = currentUser.raw_user_meta_data?.full_name || currentUser.email.split("@")[0];
@@ -919,7 +930,7 @@ function setupAuthListeners() {
     } else {
       // Show landing, hide app
       document.body.classList.add("logged-out");
-      document.body.classList.remove("logged-in");
+      document.body.classList.remove("logged-in", "pending-approval");
 
       // Reset variables
       userRole = "student";
@@ -1075,18 +1086,24 @@ async function renderClassroom() {
 // Admin Panel rendering logic
 async function renderAdminPanel() {
   const tbody = document.getElementById("userList");
-  tbody.innerHTML = `<tr><td colspan="4" class="empty-note">Đang tải danh sách người dùng...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5" class="empty-note">Đang tải danh sách người dùng...</td></tr>`;
   try {
-    const { data: users, error } = await supabaseClient.from('mathenglish_profiles').select('*').order('role', { ascending: true });
+    // Chờ duyệt lên đầu, rồi tới vai trò
+    const { data: users, error } = await supabaseClient.from('mathenglish_profiles').select('*').order('approved', { ascending: true }).order('role', { ascending: true });
     if (error) throw error;
-    
+
     tbody.innerHTML = users.map(u => {
       const isMe = u.id === currentUser.id;
+      const approved = u.approved === true;
+      const apprCell = approved
+        ? `<span class="appr-yes">✓ Đã duyệt</span>${isMe ? '' : `<br><button class="btn-approve revoke" data-approve="${u.id}" data-val="false">Huỷ duyệt</button>`}`
+        : `<span class="appr-no">⏳ Chờ duyệt</span><br><button class="btn-approve" data-approve="${u.id}" data-val="true">Duyệt</button>`;
       return `
         <tr>
           <td>${esc(u.email || "N/A")}</td>
           <td><b>${esc(u.full_name || "N/A")}</b></td>
           <td><span class="badge-role ${u.role}">${u.role}</span></td>
+          <td>${apprCell}</td>
           <td>
             <select class="change-role-select" data-uid="${u.id}" ${isMe ? 'disabled' : ''}>
               <option value="student" ${u.role === 'student' ? 'selected' : ''}>Student</option>
@@ -1098,7 +1115,7 @@ async function renderAdminPanel() {
       `;
     }).join("");
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-note" style="color:var(--coral)">Lỗi: ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-note" style="color:var(--coral)">Lỗi: ${e.message}</td></tr>`;
   }
 }
 
@@ -1121,6 +1138,23 @@ document.getElementById("adminPanel").addEventListener("change", async (e) => {
   } else {
     renderAdminPanel();
   }
+});
+
+// Bind admin panel approve / revoke buttons
+document.getElementById("adminPanel").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-approve]");
+  if (!btn) return;
+  const uid = btn.dataset.approve;
+  const val = btn.dataset.val === "true";
+  const msg = val ? "Duyệt tài khoản này cho phép vào app?" : "Huỷ duyệt tài khoản này? Người dùng sẽ không vào được app.";
+  if (!confirm(msg)) return;
+  const { error } = await supabaseClient.from("mathenglish_profiles").update({ approved: val }).eq("id", uid);
+  if (error) {
+    alert("Lỗi: " + error.message);
+  } else {
+    G() && G().toast(val ? "✅" : "🚫", "Admin", val ? "Đã duyệt tài khoản!" : "Đã huỷ duyệt", val ? "#16c47f" : "#ff5d73");
+  }
+  renderAdminPanel();
 });
 
 // Kick off Supabase setup

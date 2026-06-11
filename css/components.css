@@ -518,3 +518,59 @@ body.logged-in  #landing { display: none !important; }
   font-size: 13.5px;
   margin-top: 34px;
 }
+
+/* ============================================================
+   MÀN HÌNH CHỜ DUYỆT (giáo viên chưa được admin duyệt)
+   ============================================================ */
+.auth-note {
+  background: var(--sun-soft);
+  border: 1.5px solid var(--sun);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 4px 0 10px;
+}
+
+#pending { display: none; }
+/* Khi chờ duyệt: ẩn app + landing, chỉ hiện màn chờ */
+body.pending-approval .container,
+body.pending-approval #landing { display: none !important; }
+body.pending-approval #streakChip,
+body.pending-approval #lvlChip { display: none !important; }
+body.pending-approval #pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 24px;
+}
+.pending-card {
+  text-align: center;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: 40px 30px;
+  max-width: 480px;
+  box-shadow: 0 12px 40px rgba(22, 50, 63, .1);
+}
+.pending-ic { font-size: 56px; animation: lp-bounce 2.4s ease-in-out infinite; }
+.pending-card h1 {
+  font-family: 'Baloo 2', sans-serif;
+  font-size: clamp(22px, 4vw, 30px);
+  color: var(--ink);
+  margin: 12px 0 14px;
+}
+.pending-card p { color: var(--ink-soft); line-height: 1.6; margin: 0 0 12px; }
+.pending-card .pending-sub { font-size: 14px; color: var(--muted); }
+
+/* Cột trạng thái duyệt trong bảng quản trị */
+.appr-yes { color: var(--grass-deep); font-weight: 800; }
+.appr-no { color: var(--sun-deep); font-weight: 800; }
+.btn-approve {
+  background: var(--grass); color: #fff; border: none;
+  padding: 6px 12px; border-radius: 999px; font-weight: 700;
+  cursor: pointer; font-size: 13px; font-family: inherit;
+}
+.btn-approve.revoke { background: var(--coral); }

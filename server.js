@@ -36,7 +36,10 @@ function serveStatic(req, res) {
   if (!filePath.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end("Not found"); }
-    res.writeHead(200, { "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream" });
+    res.writeHead(200, {
+      "Content-Type": MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+      "Cache-Control": "no-cache"
+    });
     res.end(data);
   });
 }

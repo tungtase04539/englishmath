@@ -278,7 +278,7 @@
       <!-- QUẢN TRỊ (ADMIN ONLY) -->
       <section id="adminPanel" class="panel">
         <h2>🛠️ Bảng quản trị</h2>
-        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Quản lý phân quyền người dùng (Học sinh, Giáo viên, Admin).</p>
+        <p class="hint" style="text-align:left;font-weight:700;margin:6px 0 16px">Duyệt tài khoản giáo viên mới và quản lý phân quyền người dùng.</p>
         <div class="table-responsive">
           <table class="admin-table">
             <thead>
@@ -286,16 +286,28 @@
                 <th>Email</th>
                 <th>Họ tên</th>
                 <th>Vai trò hiện tại</th>
+                <th>Duyệt</th>
                 <th>Thay đổi vai trò</th>
               </tr>
             </thead>
             <tbody id="userList">
-              <tr><td colspan="4" class="empty-note">Đang tải danh sách người dùng...</td></tr>
+              <tr><td colspan="5" class="empty-note">Đang tải danh sách người dùng...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- ===== MÀN HÌNH CHỜ DUYỆT (giáo viên chưa được admin duyệt) ===== -->
+  <div id="pending">
+    <div class="pending-card">
+      <div class="pending-ic">⏳</div>
+      <h1>Tài khoản đang chờ duyệt</h1>
+      <p>Xin chào <b id="pendingName">bạn</b>! Tài khoản giáo viên của bạn đã được tạo thành công và đang chờ <b>quản trị viên</b> phê duyệt.</p>
+      <p class="pending-sub">Bạn sẽ vào được app ngay sau khi được duyệt. Vui lòng đăng nhập lại sau, hoặc liên hệ quản trị viên.</p>
+      <button id="pendingLogout" class="btn btn-danger" style="margin-top:8px">Đăng xuất</button>
+    </div>
   </div>
 
   <footer class="app-footer">Phát âm: Free Dictionary API · dự phòng giọng đọc trình duyệt · Học vui mỗi ngày! 🌟</footer>
@@ -318,9 +330,9 @@
         <p class="auth-switch">Chưa có tài khoản? <a href="#" id="toSignup">Đăng ký ngay</a></p>
       </div>
 
-      <!-- Signup View -->
+      <!-- Signup View (chỉ dành cho giáo viên) -->
       <div id="signupView" class="auth-view hidden">
-        <h2>📝 Đăng ký tài khoản</h2>
+        <h2>📝 Đăng ký tài khoản giáo viên</h2>
         <form id="signupForm">
           <label>Họ và tên</label>
           <input type="text" id="signupName" required placeholder="Nguyễn Văn A" />
@@ -328,13 +340,8 @@
           <input type="email" id="signupEmail" required placeholder="nhap@email.com" />
           <label>Mật khẩu</label>
           <input type="password" id="signupPassword" required placeholder="Tối thiểu 6 ký tự" minlength="6" />
-          <label>Vai trò (Role)</label>
-          <select id="signupRole" style="width:100%;margin-bottom:14px">
-            <option value="student">Học sinh (Student)</option>
-            <option value="teacher">Giáo viên (Teacher)</option>
-            <option value="admin">Quản trị viên (Admin)</option>
-          </select>
-          <button type="submit" class="btn btn-primary" style="margin-top:10px">Đăng ký</button>
+          <p class="auth-note">ℹ️ Tài khoản giáo viên cần được <b>quản trị viên duyệt</b> trước khi sử dụng app.</p>
+          <button type="submit" class="btn btn-primary" style="margin-top:10px">Đăng ký giáo viên</button>
         </form>
         <p class="auth-switch">Đã có tài khoản? <a href="#" id="toLogin">Đăng nhập</a></p>
       </div>
