@@ -118,6 +118,11 @@
         <div class="toolbar">
           <input type="search" id="searchBox" placeholder="🔍 Tìm từ vựng..." />
           <select id="topicFilter"></select>
+          <select id="learnFilter">
+            <option value="">Tất cả từ</option>
+            <option value="learned">✓ Đã thuộc</option>
+            <option value="unlearned">○ Chưa thuộc</option>
+          </select>
         </div>
         <div id="wordList" class="word-grid"></div>
       </section>
@@ -162,6 +167,10 @@
       <section id="speaking" class="panel">
         <div class="speaking-controls">
           <select id="speakTopic"></select>
+          <select id="speakFilter">
+            <option value="">Tất cả từ</option>
+            <option value="todo">Chưa đạt 80%</option>
+          </select>
           <span id="speakCounter" class="counter"></span>
         </div>
         <div id="speakUnsupported" class="hidden notice">

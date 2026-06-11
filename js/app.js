@@ -149,12 +149,18 @@ function esc(s) { return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 // ---------- DICTIONARY ----------
 const searchBox = document.getElementById("searchBox");
 const topicFilter = document.getElementById("topicFilter");
+const learnFilter = document.getElementById("learnFilter");
 const wordList = document.getElementById("wordList");
 fillTopicSelect(topicFilter, "Tất cả chủ đề");
 function renderDictionary() {
   const q = searchBox.value.toLowerCase().trim();
   const tp = topicFilter.value;
-  const items = VOCAB.filter(v => (!tp || v.topic === tp) && (!q || v.word.toLowerCase().includes(q) || v.vi.toLowerCase().includes(q)));
+  const lf = learnFilter.value;
+  const items = VOCAB.filter(v =>
+    (!tp || v.topic === tp) &&
+    (!q || v.word.toLowerCase().includes(q) || v.vi.toLowerCase().includes(q)) &&
+    (lf === "" || (lf === "learned" ? store.isLearned(v.word) : !store.isLearned(v.word)))
+  );
   wordList.innerHTML = items.map(v => `
     <div class="word-card">
       <div class="top">
@@ -174,6 +180,7 @@ function renderDictionary() {
 }
 searchBox.addEventListener("input", renderDictionary);
 topicFilter.addEventListener("change", renderDictionary);
+learnFilter.addEventListener("change", renderDictionary);
 wordList.addEventListener("click", e => { const b = e.target.closest(".speak-btn"); if (b) speak(b.dataset.word); });
 renderDictionary();
 
@@ -294,6 +301,7 @@ function finishQuiz() {
 // ---------- SPEAKING ----------
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speakTopic = document.getElementById("speakTopic");
+const speakFilter = document.getElementById("speakFilter");
 const speakBox = document.getElementById("speakBox");
 const speakCounter = document.getElementById("speakCounter");
 const spStatus = document.getElementById("spStatus");
@@ -310,9 +318,26 @@ function updateSpeakSupport() {
   if (ok && !speakDeck.length) buildSpeakDeck();
 }
 updateSpeakSupport();
-function buildSpeakDeck() { const tp = speakTopic.value; speakDeck = VOCAB.filter(v => !tp || v.topic === tp); speakIdx = 0; showSpeak(); }
+function buildSpeakDeck() {
+  const tp = speakTopic.value;
+  const fl = speakFilter ? speakFilter.value : "";
+  speakDeck = VOCAB.filter(v =>
+    (!tp || v.topic === tp) &&
+    (fl !== "todo" || (store.data.speaking[v.word] || 0) < 80)
+  );
+  speakIdx = 0;
+  showSpeak();
+}
 function showSpeak() {
-  const v = speakDeck[speakIdx]; if (!v) return;
+  const v = speakDeck[speakIdx];
+  if (!v) {
+    speakBox.querySelector(".sp-word").textContent = "🎉";
+    speakBox.querySelector(".sp-ipa").textContent = "";
+    speakBox.querySelector(".sp-vi").textContent = "Tuyệt vời! Không còn từ nào cần luyện thêm.";
+    speakCounter.textContent = "0 / 0";
+    spStatus.textContent = ""; spFeedback.innerHTML = "";
+    return;
+  }
   speakBox.querySelector(".sp-word").textContent = v.word;
   speakBox.querySelector(".sp-ipa").textContent = v.ipa;
   speakBox.querySelector(".sp-vi").textContent = v.vi;
@@ -433,6 +458,7 @@ function showSpeakFeedback(target, heard, score) {
   const hear = document.getElementById("spHear"); if (hear) hear.onclick = () => speak(target.word);
 }
 speakTopic.addEventListener("change", buildSpeakDeck);
+if (speakFilter) speakFilter.addEventListener("change", buildSpeakDeck);
 if (SR || speechaceOn) buildSpeakDeck();
 
 // ---------- READING ----------
