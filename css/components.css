@@ -714,3 +714,18 @@ body.pending-approval #pending {
   transform: translateY(-2px) scale(1.12);
   font-weight: 700;
 }
+
+/* ============================================================
+   CHECKPOINT LUYỆN NÓI (lưu/tiếp tục vị trí)
+   ============================================================ */
+.btn-sm { min-height: 0; padding: 7px 12px; font-size: .85rem; box-shadow: 0 3px 0 var(--line-strong), var(--sh-sm); }
+.sp-checkpoint {
+  background: var(--sun-soft);
+  border: 1.5px solid var(--sun);
+  color: var(--ink-soft);
+  border-radius: var(--r-sm);
+  padding: 9px 13px;
+  font-size: 13.5px;
+  font-weight: 700;
+  margin: 10px 0 0;
+}

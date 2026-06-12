@@ -441,14 +441,32 @@ function updateSpeakSupport() {
   if (ok && !speakDeck.length) buildSpeakDeck();
 }
 updateSpeakSupport();
-function buildSpeakDeck() {
+// Checkpoint: ghi nhớ từ đang luyện dở để lần sau vào tiếp tục đúng chỗ
+const SPEAK_CKPT_KEY = "mathenglish_speak_ckpt";
+function saveSpeakCheckpoint(word) { try { localStorage.setItem(SPEAK_CKPT_KEY, word || ""); } catch (e) {} }
+function getSpeakCheckpoint() { try { return localStorage.getItem(SPEAK_CKPT_KEY) || ""; } catch (e) { return ""; } }
+
+function buildSpeakDeck(resume = true) {
   const tp = speakTopic.value;
   const fl = speakFilter ? speakFilter.value : "";
   speakDeck = VOCAB.filter(v =>
     (!tp || v.topic === tp) &&
     (fl !== "todo" || (store.data.speaking[v.word] || 0) < 80)
   );
-  speakIdx = 0;
+  // Tiếp tục từ checkpoint nếu từ đó còn trong danh sách hiện tại
+  let resumed = false;
+  if (resume) {
+    const ck = getSpeakCheckpoint();
+    const i = ck ? speakDeck.findIndex(v => v.word === ck) : -1;
+    if (i > 0) { speakIdx = i; resumed = true; } else speakIdx = 0;
+  } else {
+    speakIdx = 0;
+  }
+  const cpEl = document.getElementById("spCheckpoint");
+  if (cpEl) {
+    cpEl.classList.toggle("hidden", !resumed);
+    if (resumed) cpEl.textContent = `📍 Đang tiếp tục ở từ thứ ${speakIdx + 1}. Bấm "⟲ Bắt đầu lại" nếu muốn luyện từ đầu.`;
+  }
   showSpeak();
 }
 // Tách IPA thành âm tiết để karaoke (theo dấu "." hoặc khoảng trắng; bỏ //)
@@ -510,6 +528,7 @@ function showSpeak() {
   speakCounter.textContent = `${speakIdx + 1} / ${speakDeck.length}`;
   spStatus.textContent = ""; spFeedback.innerHTML = "";
   prefetchAudio(v.word);
+  saveSpeakCheckpoint(v.word); // ghi nhớ vị trí đang luyện
   const best = store.data.speaking[v.word];
   if (best != null) spStatus.textContent = `Điểm tốt nhất của bạn: ${best}%`;
 }
@@ -527,6 +546,11 @@ document.getElementById("spListen").onclick = () => { const v = speakDeck[speakI
 document.getElementById("spListenSlow").onclick = () => { const v = speakDeck[speakIdx]; if (v) speakWordTTS(v.word, v.ipa, true); };
 document.getElementById("spPrev").onclick = () => { speakIdx = (speakIdx - 1 + speakDeck.length) % speakDeck.length; showSpeak(); };
 document.getElementById("spNext").onclick = () => { speakIdx = (speakIdx + 1) % speakDeck.length; showSpeak(); };
+document.getElementById("spRestart").onclick = () => {
+  speakIdx = 0;
+  const cpEl = document.getElementById("spCheckpoint"); if (cpEl) cpEl.classList.add("hidden");
+  showSpeak(); // showSpeak sẽ cập nhật checkpoint về từ đầu
+};
 function startRecordUI() { recognizing = true; spRecord.classList.add("sp-record-active"); spRecord.textContent = "🔴 Đang nghe..."; spStatus.textContent = "Hãy đọc từ to và rõ ràng..."; spFeedback.innerHTML = ""; }
 function endRecordUI() { recognizing = false; spRecord.classList.remove("sp-record-active"); spRecord.textContent = "🎤 Đọc lại"; }
 let mediaRec = null, recChunks = [];
