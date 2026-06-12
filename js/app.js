@@ -41,16 +41,16 @@ function stopSpeak() {
 function speak(word) {
   const key = word.toLowerCase().trim();
   stopSpeak(); // bấm liên tục không bị chồng tiếng / lag dồn
-  // Cụm nhiều từ (vd "prime number"): audio từ điển chỉ có 1 từ → đọc sai cả
-  // cụm. Dùng TTS để đọc đúng nguyên cụm.
-  if (key.includes(" ")) { ttsSpeak(word); return; }
   const cached = audioCache[key];
-  if (cached) {
-    playAudio(cached, word);          // có sẵn audio đẹp → phát ngay
-  } else {
-    ttsSpeak(word);                   // chưa có → đọc bằng giọng trình duyệt (tức thì, offline)
-    if (cached === undefined) prefetchAudio(key); // tải audio đẹp cho lần sau
+  if (cached) {                 // audio từ điển đã tải (giọng người bản xứ) — chỉ 1 số từ đơn
+    playAudio(cached, word);
+    return;
   }
+  // Nguồn chính: giọng đọc trình duyệt (speechSynthesis) — đáng tin nhất, đọc
+  // được MỌI từ/cụm, hoạt động offline. (Google/StreamElements TTS bị chặn khi
+  // gọi từ trình duyệt; dictionaryapi rate-limit gắt nên chỉ dùng best-effort.)
+  ttsSpeak(word);
+  if (!key.includes(" ") && cached === undefined) prefetchAudio(key); // tải dần audio bản xứ cho lần sau
 }
 function playAudio(src, word) {
   try {
@@ -90,17 +90,29 @@ if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged 
 let ttsRef = null;
 function ttsSpeak(text) {
   if (!("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  if (!enVoice) pickVoice();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 0.9;
-  if (enVoice) { u.voice = enVoice; u.lang = enVoice.lang; } else u.lang = "en-US";
-  ttsRef = u;
-  // Chrome đôi khi "nuốt" lệnh nếu speak() gọi ngay sau cancel() — đẩy sang
-  // microtask kế tiếp để đảm bảo phát ra tiếng (sửa lỗi "ấn không đọc").
-  setTimeout(() => {
-    try { speechSynthesis.speak(u); if (speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
-  }, 0);
+  const doSpeak = () => {
+    try { speechSynthesis.cancel(); } catch (e) {}
+    if (!enVoice) pickVoice();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.9;
+    if (enVoice) { u.voice = enVoice; u.lang = enVoice.lang; } else u.lang = "en-US";
+    ttsRef = u;
+    // Chrome đôi khi "nuốt" lệnh nếu speak() gọi ngay sau cancel() — đẩy sang
+    // tick kế tiếp; resume() để thoát trạng thái pause/kẹt (sửa "ấn không đọc").
+    setTimeout(() => {
+      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) {}
+    }, 0);
+  };
+  // Lần đầu, danh sách giọng có thể chưa nạp xong → chờ rồi mới đọc (nếu không
+  // sẽ không ra tiếng ở từ đầu tiên).
+  if (!speechSynthesis.getVoices().length) {
+    let spoken = false;
+    const fire = () => { if (spoken) return; spoken = true; pickVoice(); doSpeak(); };
+    speechSynthesis.addEventListener("voiceschanged", fire, { once: true });
+    setTimeout(fire, 300); // phòng khi voiceschanged không bắn
+  } else {
+    doSpeak();
+  }
 }
 
 // ---------- Mascot intros per screen ----------
