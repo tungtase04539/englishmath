@@ -41,6 +41,9 @@ function stopSpeak() {
 function speak(word) {
   const key = word.toLowerCase().trim();
   stopSpeak(); // bấm liên tục không bị chồng tiếng / lag dồn
+  // Cụm nhiều từ (vd "prime number"): audio từ điển chỉ có 1 từ → đọc sai cả
+  // cụm. Dùng TTS để đọc đúng nguyên cụm.
+  if (key.includes(" ")) { ttsSpeak(word); return; }
   const cached = audioCache[key];
   if (cached) {
     playAudio(cached, word);          // có sẵn audio đẹp → phát ngay
@@ -60,6 +63,7 @@ function playAudio(src, word) {
 }
 async function prefetchAudio(word) {
   const key = word.toLowerCase().trim();
+  if (key.includes(" ")) return; // cụm từ dùng TTS, không cần audio từ điển 1 chữ
   if (audioCache[key] !== undefined) return;
   const u = await fetchAudioUrl(key);
   audioCache[key] = u || null; // ghi null để không gọi API lại
