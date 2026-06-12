@@ -693,3 +693,24 @@ body.pending-approval #pending {
 @media (max-width: 720px) {
   .create-student-form { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   KARAOKE PHIÊN ÂM (Luyện nói)
+   ============================================================ */
+.sp-ipa { font-size: 20px; letter-spacing: .5px; }
+.ipa-slash { color: var(--muted); }
+.ipa-sep { color: var(--line-strong); margin: 0 1px; }
+.ipa-syl {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 6px;
+  color: var(--ink-soft);
+  transition: color .12s ease, background-color .12s ease, transform .12s ease;
+}
+.ipa-syl.done { color: var(--grass-deep); }
+.ipa-syl.on {
+  color: #fff;
+  background: var(--grass);
+  transform: translateY(-2px) scale(1.12);
+  font-weight: 700;
+}

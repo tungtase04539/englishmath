@@ -36,6 +36,7 @@ let currentAudio = null; // <audio> đang phát, để dừng khi bấm từ kh�
 function stopSpeak() {
   if (currentAudio) { try { currentAudio.pause(); currentAudio.currentTime = 0; } catch (e) {} currentAudio = null; }
   if ("speechSynthesis" in window) speechSynthesis.cancel();
+  if (typeof clearKaraoke === "function") clearKaraoke();
 }
 
 function speak(word) {
@@ -450,6 +451,49 @@ function buildSpeakDeck() {
   speakIdx = 0;
   showSpeak();
 }
+// Tách IPA thành âm tiết để karaoke (theo dấu "." hoặc khoảng trắng; bỏ //)
+function ipaSyllables(ipa) {
+  const s = (ipa || "").trim().replace(/^\/+|\/+$/g, "");
+  if (!s) return [];
+  const parts = s.split(/[.\s]+/).filter(Boolean);
+  return parts.length ? parts : [s];
+}
+let karaokeTimer = null;
+function clearKaraoke() { if (karaokeTimer) { clearInterval(karaokeTimer); karaokeTimer = null; } }
+// Hiển thị phiên âm chuẩn dạng các âm tiết (để highlight karaoke)
+function renderSpIpa(ipa) {
+  const el = speakBox.querySelector(".sp-ipa");
+  const sylls = ipaSyllables(ipa);
+  el.innerHTML = sylls.length
+    ? `<span class="ipa-slash">/</span>` + sylls.map((s, i) => `<span class="ipa-syl" data-i="${i}">${esc(s)}</span>`).join(`<span class="ipa-sep">·</span>`) + `<span class="ipa-slash">/</span>`
+    : "";
+}
+// Phát mẫu bằng TTS (điều khiển được tốc độ) + karaoke highlight phiên âm
+function speakWordTTS(word, ipa, slow) {
+  if (!("speechSynthesis" in window)) { speak(word); return; }   // không có TTS → phát thường
+  stopSpeak(); clearKaraoke();
+  const el = speakBox.querySelector(".sp-ipa");
+  if (!el.querySelector(".ipa-syl")) renderSpIpa(ipa);
+  const sylls = el.querySelectorAll(".ipa-syl");
+  sylls.forEach(s => s.classList.remove("on", "done"));
+  if (!enVoice) pickVoice();
+  const u = new SpeechSynthesisUtterance(word);
+  u.rate = slow ? 0.4 : 0.85;
+  if (enVoice) { u.voice = enVoice; u.lang = enVoice.lang; } else u.lang = "en-US";
+  let idx = 0;
+  const perSyl = slow ? 560 : 320; // ms ước lượng mỗi âm tiết theo tốc độ đọc
+  const step = () => {
+    sylls.forEach((s, i) => { s.classList.toggle("on", i === idx); s.classList.toggle("done", i < idx); });
+    idx++;
+    if (idx > sylls.length) clearKaraoke();
+  };
+  u.onstart = () => { clearKaraoke(); step(); if (sylls.length > 1) karaokeTimer = setInterval(step, perSyl); };
+  u.onend = () => { clearKaraoke(); sylls.forEach(s => { s.classList.remove("on"); s.classList.add("done"); }); };
+  u.onerror = () => clearKaraoke();
+  ttsRef = u;
+  setTimeout(() => { try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) {} }, 0);
+}
+
 function showSpeak() {
   const v = speakDeck[speakIdx];
   if (!v) {
@@ -461,7 +505,7 @@ function showSpeak() {
     return;
   }
   speakBox.querySelector(".sp-word").textContent = v.word;
-  speakBox.querySelector(".sp-ipa").textContent = v.ipa;
+  renderSpIpa(v.ipa);
   speakBox.querySelector(".sp-vi").textContent = v.vi;
   speakCounter.textContent = `${speakIdx + 1} / ${speakDeck.length}`;
   spStatus.textContent = ""; spFeedback.innerHTML = "";
@@ -479,7 +523,8 @@ function similarity(a, b) {
     dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
   return Math.round((1 - dp[m][n] / Math.max(m, n)) * 100);
 }
-document.getElementById("spListen").onclick = () => { const v = speakDeck[speakIdx]; if (v) speak(v.word); };
+document.getElementById("spListen").onclick = () => { const v = speakDeck[speakIdx]; if (v) speakWordTTS(v.word, v.ipa, false); };
+document.getElementById("spListenSlow").onclick = () => { const v = speakDeck[speakIdx]; if (v) speakWordTTS(v.word, v.ipa, true); };
 document.getElementById("spPrev").onclick = () => { speakIdx = (speakIdx - 1 + speakDeck.length) % speakDeck.length; showSpeak(); };
 document.getElementById("spNext").onclick = () => { speakIdx = (speakIdx + 1) % speakDeck.length; showSpeak(); };
 function startRecordUI() { recognizing = true; spRecord.classList.add("sp-record-active"); spRecord.textContent = "🔴 Đang nghe..."; spStatus.textContent = "Hãy đọc từ to và rõ ràng..."; spFeedback.innerHTML = ""; }
@@ -496,17 +541,53 @@ async function recordWithSpeechace(target) {
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch (e) { spStatus.textContent = "⚠️ Không truy cập được micro. Hãy cho phép quyền micro."; return; }
+
+  // Chạy Web Speech SONG SONG để có ĐIỂM DỰ PHÒNG nếu Speechace lỗi/không chấm
+  // (đây là gốc lỗi "thỉnh thoảng không chấm điểm" — Speechace lỗi là mất điểm).
+  const fallback = { score: null, heard: "" };
+  let srRec = null;
+  if (SR) {
+    try {
+      srRec = new SR(); srRec.lang = "en-US"; srRec.interimResults = false; srRec.maxAlternatives = 5;
+      srRec.onresult = e => {
+        const alts = [...e.results[0]].map(r => r.transcript);
+        fallback.heard = alts[0] || "";
+        fallback.score = Math.max(...alts.map(a => similarity(a, target.word)));
+      };
+      srRec.onerror = () => {};
+      srRec.start();
+    } catch (e) { srRec = null; }
+  }
+
+  const useFallbackOr = (msg) => {
+    if (fallback.score != null) { showSpeakFeedback(target, fallback.heard, fallback.score); awardSpeak(target, fallback.score); }
+    else spStatus.textContent = msg;
+  };
+
   recChunks = []; mediaRec = new MediaRecorder(stream);
   mediaRec.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
   mediaRec.onstop = async () => {
     stream.getTracks().forEach(t => t.stop());
+    try { if (srRec) srRec.stop(); } catch (e) {}
     spRecord.classList.remove("sp-record-active"); spRecord.textContent = "🎤 Đọc lại";
+    const total = recChunks.reduce((a, c) => a + (c.size || 0), 0);
+    if (total < 800) { // ghi âm rỗng/quá ngắn
+      recognizing = false;
+      await new Promise(r => setTimeout(r, 350)); // chờ Web Speech kịp trả kết quả
+      useFallbackOr("Không nghe thấy gì, hãy đọc to và thử lại.");
+      return;
+    }
     spStatus.textContent = "Đang chấm điểm...";
     const blob = new Blob(recChunks, { type: mediaRec.mimeType || "audio/webm" });
     try {
       const res = await fetch("/api/assess?text=" + encodeURIComponent(target.word), { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
-      const json = await res.json(); recognizing = false; handleSpeechaceResult(target, json);
-    } catch (e) { recognizing = false; spStatus.textContent = "Lỗi gửi âm thanh: " + e.message; }
+      const json = res.ok ? await res.json() : null;
+      recognizing = false;
+      handleSpeechaceResult(target, json, fallback);
+    } catch (e) {
+      recognizing = false;
+      useFallbackOr("Lỗi chấm điểm, hãy thử lại.");
+    }
   };
   recognizing = true; mediaRec.start();
   spRecord.classList.add("sp-record-active"); spRecord.textContent = "🔴 Đang ghi... (bấm để dừng)";
@@ -518,9 +599,11 @@ function awardSpeak(target, overall) {
   if (overall >= 80) { store.markLearned(target.word); G() && G().correct(20); G() && G().burst({ count: 90 }); }
   else { G() && G().touchStreak(); }
 }
-function handleSpeechaceResult(target, json) {
+function handleSpeechaceResult(target, json, fallback) {
   if (!json || json.status !== "success" || !json.text_score) {
-    spStatus.textContent = json && json.error ? json.error : "Không chấm được (đọc chưa rõ hoặc hết lượt trial). Hãy thử lại."; return;
+    // Speechace không chấm được → dùng điểm dự phòng Web Speech để LUÔN có điểm
+    if (fallback && fallback.score != null) { showSpeakFeedback(target, fallback.heard, fallback.score); awardSpeak(target, fallback.score); return; }
+    spStatus.textContent = json && json.error ? json.error : "Không chấm được (đọc chưa rõ). Hãy đọc to, rõ và thử lại."; return;
   }
   const ts = json.text_score; const words = ts.word_score_list || [];
   const overall = ts.speechace_score && ts.speechace_score.pronunciation != null
@@ -541,7 +624,7 @@ function handleSpeechaceResult(target, json) {
     <button class="btn" id="spRetry" style="margin-top:8px">🔁 Thử lại</button>
     <button class="btn btn-sky" id="spHear" style="margin-top:8px">🔊 Nghe mẫu</button>`;
   document.getElementById("spRetry").onclick = () => spRecord.click();
-  document.getElementById("spHear").onclick = () => speak(target.word);
+  document.getElementById("spHear").onclick = () => speakWordTTS(target.word, target.ipa, false);
   awardSpeak(target, overall);
 }
 function recordWithWebSpeech(target, retried) {
@@ -577,7 +660,7 @@ function showSpeakFeedback(target, heard, score) {
     ${score < 80 ? `<button class="btn" id="spRetry" style="margin-top:10px">🔁 Thử lại</button>
       <button class="btn btn-sky" id="spHear" style="margin-top:10px">🔊 Nghe mẫu</button>` : ""}`;
   const retry = document.getElementById("spRetry"); if (retry) retry.onclick = () => spRecord.click();
-  const hear = document.getElementById("spHear"); if (hear) hear.onclick = () => speak(target.word);
+  const hear = document.getElementById("spHear"); if (hear) hear.onclick = () => speakWordTTS(target.word, target.ipa, false);
 }
 speakTopic.addEventListener("change", buildSpeakDeck);
 if (speakFilter) speakFilter.addEventListener("change", buildSpeakDeck);
